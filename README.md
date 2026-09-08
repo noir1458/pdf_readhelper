@@ -12,7 +12,9 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Local PDF picker and drag-and-drop
 - Public HTTP(S) and direct `file://` PDF loading where Chrome permits it
 - Current-page detection, page navigation, zoom, fit-width, and fit-height
+- Auto-compacting translucent top toolbar that leaves page actions and the page counter visible
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
+- Hover-expanding sidebar rail that overlays the document instead of reducing its width
 - Local saved-document shelf with cover thumbnails, filenames, and last-read pages
 - Per-document page restoration across viewer and browser restarts
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
@@ -75,7 +77,8 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- Use the top-left menu button to show or hide the document sidebar.
+- Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain in a translucent floating group. Move to the very top edge of the window to reveal the full toolbar again.
+- Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
 
@@ -199,6 +202,8 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Reload Chrome and verify that saved documents and last-read pages remain available
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
+- [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls
+- [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears
 - [ ] Confirm normal white-page margins are cropped without cutting headers, footers, or page numbers
 - [ ] Confirm colored covers, blank pages, scanned pages, and dark pages use safe bounds

@@ -188,7 +188,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar contains a compact document toolbar with **IMG / Copy**, **PDF / Range**, and **AI / Translate** controls. It appears after a document loads and keeps page actions together with navigation. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar contains a compact document toolbar with **IMG / Copy**, **PDF / Range**, and **AI / Translate** controls. It appears after a document loads and keeps page actions together with navigation. When idle, non-page controls tuck away and the remaining actions/page field float translucently over the viewer. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -217,7 +217,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. When the pointer leaves the full top toolbar, it compacts into a translucent floating group containing only IMG, PDF, AI, and current/total page; the full controls return from a top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
 
 Selectable text and annotations/links are deferred from the first stable MVP because PDF.js text/annotation layer APIs change frequently and require version-pinned browser validation. This limitation must remain visible in README/status rather than being implied as complete.
 
@@ -340,6 +340,7 @@ npm run check
 - [x] Independent current-page PNG rendering, clipboard write, and fallback download
 - [x] Local per-page neutral-margin detection, safe padded crop, full-page fallback, and 70% PNG resampling
 - [x] Explicit right-side OpenAI page translation, session-only API key, local page cache, token display, and translation copy
+- [x] Auto-compacting translucent top chrome and hover-expanding overlay sidebar for a larger PDF viewport
 - [x] Inclusive original-page PDF extraction with `7.pdf` / `2-11.pdf` naming
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
@@ -353,8 +354,8 @@ npm run check
 
 ### Next
 
-1. Load `dist/` unpacked and complete the README manual verification checklist, including crop safety and an API translation request with a low-limit test key.
-2. Fix any Chrome-runtime issues found in worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
+1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
+2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
 3. After stable verification, consider selectable text/link layers.
 
 ### Blockers
@@ -420,3 +421,9 @@ npm run check
 **Reason:** The product is a private unpacked extension for one user, and the requested workflow benefits from an integrated page translation view. Session-only handling limits key persistence while keeping the interaction practical.
 
 **Consequences:** Direct client-side bearer credentials are not appropriate for a distributed extension and conflict with OpenAI's production guidance to keep API keys on a server. Any future public distribution must replace this path with a backend issuing short-lived credentials or proxying requests. The UI and README must disclose that page images are sent to OpenAI only after the user clicks Translate.
+
+### 2026-09-08 — Auto-hide viewer chrome without shrinking the PDF
+
+**Decision:** Compact the top toolbar after pointer leave into a translucent action/page group, restore it through a full-width top-edge hover target or keyboard focus, and turn the enabled left sidebar into a 48px rail whose content expands as an overlay on hover/focus.
+
+**Reason:** Persistent document-opening and navigation controls consumed reading space after a PDF was already open. The retained IMG/PDF/AI actions and page field remain immediately available while infrequent controls tuck toward their corresponding screen edges.

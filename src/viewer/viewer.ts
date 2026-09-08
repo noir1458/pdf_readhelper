@@ -43,6 +43,8 @@ const urlInput = requireElement<HTMLInputElement>("#url-input");
 const pageInput = requireElement<HTMLInputElement>("#page-input");
 const totalPages = requireElement<HTMLElement>("#total-pages");
 const dropOverlay = requireElement<HTMLElement>("#drop-overlay");
+const topbar = requireElement<HTMLElement>(".topbar");
+const topbarRevealZone = requireElement<HTMLElement>("#topbar-reveal-zone");
 const sidebar = requireElement<HTMLElement>("#document-sidebar");
 const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
@@ -56,6 +58,7 @@ let dragDepth = 0;
 let activeDocumentId: string | null = null;
 let positionSaveTimer = 0;
 let translationRequestController: AbortController | null = null;
+let topbarCollapseTimer = 0;
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -121,6 +124,17 @@ pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") navigateFromInput();
 });
+topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
+topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
+topbar.addEventListener("focusin", (event) => {
+  if (event.target instanceof Element && event.target.matches(":focus-visible")) showFullTopbar();
+});
+topbar.addEventListener("focusout", () => {
+  window.requestAnimationFrame(() => {
+    if (!topbar.matches(":focus-within")) scheduleTopbarCollapse();
+  });
+});
+topbarRevealZone.addEventListener("pointerenter", showFullTopbar);
 
 window.addEventListener("dragenter", handleDragEnter);
 window.addEventListener("dragover", handleDragOver);
@@ -229,6 +243,7 @@ async function openBytes(
   documentSidebar.setActiveDocument(libraryId);
   if (translationPanel.isOpen) void loadCachedTranslation(initialPage);
   toolbar.show(pdfDocument.numPages);
+  scheduleTopbarCollapse();
   sidebarToggle.disabled = false;
   documentSidebar.showPanel(options.keepDocumentsPanel ? "documents" : "thumbnails");
   void documentSidebar.setDocument(pdfDocument);
@@ -452,6 +467,20 @@ function setSidebarOpen(open: boolean): void {
   sidebarToggle.setAttribute("aria-label", open ? "Hide sidebar" : "Show sidebar");
   sidebarToggle.title = open ? "Hide sidebar" : "Show sidebar";
   if (open) documentSidebar.revealCurrentPage();
+}
+
+function scheduleTopbarCollapse(): void {
+  window.clearTimeout(topbarCollapseTimer);
+  if (!session.snapshot.document) return;
+  topbarCollapseTimer = window.setTimeout(() => {
+    if (topbar.matches(":hover") || topbar.querySelector(":focus-visible")) return;
+    topbar.classList.add("is-compact");
+  }, 450);
+}
+
+function showFullTopbar(): void {
+  window.clearTimeout(topbarCollapseTimer);
+  topbar.classList.remove("is-compact");
 }
 
 function toggleTranslationPanel(): void {
