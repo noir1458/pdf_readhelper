@@ -56,47 +56,47 @@ input:focus-visible {
   inset: 0 0 auto;
   z-index: 22;
   transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    opacity 0.18s ease;
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
 }
 .topbar.is-compact {
-  inset: 8px 10px auto auto;
-  width: auto;
-  height: 44px;
-  gap: 6px;
-  padding: 2px 6px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: rgba(20, 22, 27, 0.2);
+  background: transparent;
+  border-color: transparent;
   box-shadow: none;
-  opacity: 0.72;
-  backdrop-filter: blur(7px);
+  pointer-events: none;
 }
-.topbar.is-compact:hover,
-.topbar.is-compact:focus-within {
-  border-color: var(--border);
-  background: rgba(20, 22, 27, 0.68);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.24);
-  opacity: 1;
+.topbar .sidebar-button,
+.topbar .brand,
+.topbar #open-file,
+.topbar .url-form,
+.topbar .viewer-controls > button {
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.72, 0.25, 1),
+    opacity 0.16s ease,
+    visibility 0s linear;
 }
 .topbar.is-compact .sidebar-button,
 .topbar.is-compact .brand,
 .topbar.is-compact #open-file,
 .topbar.is-compact .url-form,
 .topbar.is-compact .viewer-controls > button {
-  display: none;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(-1 * var(--bar-height)));
+  transition:
+    transform 0.22s cubic-bezier(0.4, 0, 0.7, 0.2),
+    opacity 0.14s ease,
+    visibility 0s linear 0.22s;
 }
 .topbar.is-compact .document-toolbar,
-.topbar.is-compact .viewer-controls {
-  margin-left: 0;
+.topbar.is-compact .page-field {
+  pointer-events: auto;
 }
 .topbar.is-compact .document-tool {
-  width: 38px;
-  height: 36px;
-  min-height: 36px;
-  background: rgba(45, 49, 56, 0.72);
+  background: rgba(45, 49, 56, 0.68);
+  backdrop-filter: blur(7px);
 }
 .topbar.is-compact .document-tool:hover {
   background: #3a3f48;
@@ -105,21 +105,25 @@ input:focus-visible {
   display: none;
 }
 .topbar.is-compact .page-field {
-  min-height: 36px;
-  padding: 0 6px 0 1px;
   border-radius: 9px;
-  background: rgba(17, 19, 24, 0.64);
+  background: rgba(17, 19, 24, 0.58);
+  box-shadow: 0 0 0 4px rgba(17, 19, 24, 0.58);
+  backdrop-filter: blur(7px);
 }
 .topbar.is-compact .page-field input {
-  width: 42px;
   border-color: transparent;
   background: transparent;
 }
 .topbar-reveal-zone {
   position: fixed;
   inset: 0 0 auto;
-  z-index: 23;
-  height: 5px;
+  z-index: 21;
+  height: 0;
+  pointer-events: none;
+}
+.topbar.is-compact + .topbar-reveal-zone {
+  height: 14px;
+  pointer-events: auto;
 }
 .brand {
   font-weight: 700;

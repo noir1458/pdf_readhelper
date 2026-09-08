@@ -12,7 +12,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Local PDF picker and drag-and-drop
 - Public HTTP(S) and direct `file://` PDF loading where Chrome permits it
 - Current-page detection, page navigation, zoom, fit-width, and fit-height
-- Auto-compacting translucent top toolbar that leaves page actions and the page counter visible
+- Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
 - Local saved-document shelf with cover thumbnails, filenames, and last-read pages
@@ -77,7 +77,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain in a translucent floating group. Move to the very top edge of the window to reveal the full toolbar again.
+- Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.

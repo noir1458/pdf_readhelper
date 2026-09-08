@@ -188,7 +188,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar contains a compact document toolbar with **IMG / Copy**, **PDF / Range**, and **AI / Translate** controls. It appears after a document loads and keeps page actions together with navigation. When idle, non-page controls tuck away and the remaining actions/page field float translucently over the viewer. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar contains a compact document toolbar with **IMG / Copy**, **PDF / Range**, and **AI / Translate** controls. It appears after a document loads and keeps page actions together with navigation. When idle, non-page controls animate upward while the remaining actions/page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -217,7 +217,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. When the pointer leaves the full top toolbar, it compacts into a translucent floating group containing only IMG, PDF, AI, and current/total page; the full controls return from a top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. When the pointer leaves the full top toolbar, non-page controls slide upward while IMG, PDF, AI, and current/total page remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
 
 Selectable text and annotations/links are deferred from the first stable MVP because PDF.js text/annotation layer APIs change frequently and require version-pinned browser validation. This limitation must remain visible in README/status rather than being implied as complete.
 
@@ -340,7 +340,7 @@ npm run check
 - [x] Independent current-page PNG rendering, clipboard write, and fallback download
 - [x] Local per-page neutral-margin detection, safe padded crop, full-page fallback, and 70% PNG resampling
 - [x] Explicit right-side OpenAI page translation, session-only API key, local page cache, token display, and translation copy
-- [x] Auto-compacting translucent top chrome and hover-expanding overlay sidebar for a larger PDF viewport
+- [x] Animated auto-compacting top chrome with position-stable retained controls and a hover-expanding overlay sidebar
 - [x] Inclusive original-page PDF extraction with `7.pdf` / `2-11.pdf` naming
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
@@ -424,6 +424,6 @@ npm run check
 
 ### 2026-09-08 — Auto-hide viewer chrome without shrinking the PDF
 
-**Decision:** Compact the top toolbar after pointer leave into a translucent action/page group, restore it through a full-width top-edge hover target or keyboard focus, and turn the enabled left sidebar into a 48px rail whose content expands as an overlay on hover/focus.
+**Decision:** After pointer leave, animate non-page toolbar controls upward without removing their layout slots, leaving translucent IMG/PDF/AI actions and the page field at the exact same coordinates they occupy when expanded. Restore the full toolbar through a 14px full-width top-edge hover target or keyboard focus. Turn the enabled left sidebar into a 48px rail whose content expands as an overlay on hover/focus.
 
-**Reason:** Persistent document-opening and navigation controls consumed reading space after a PDF was already open. The retained IMG/PDF/AI actions and page field remain immediately available while infrequent controls tuck toward their corresponding screen edges.
+**Reason:** Persistent document-opening and navigation controls consumed reading space after a PDF was already open. Retaining layout slots prevents the always-visible controls from jumping when the bar changes state, while the wider reveal strip and matched motion make recovery predictable.
