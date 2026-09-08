@@ -15,6 +15,7 @@ import { UrlPopover } from "../ui/url-popover";
 import { DocumentSession } from "./document-session";
 import { DocumentSidebar } from "./document-sidebar";
 import { hasFileDragType } from "./drag-data";
+import { isPageCopyShortcut } from "./keyboard-shortcuts";
 import {
   DocumentLibrary,
   documentLibraryId,
@@ -129,6 +130,7 @@ pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") navigateFromInput();
 });
+document.addEventListener("keydown", handlePageCopyShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
 topbar.addEventListener("focusin", (event) => {
@@ -161,9 +163,32 @@ document.addEventListener("visibilitychange", () => {
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isExtensionMessage(message)) return;
   void currentTabId().then((tabId) => {
-    if (tabId === message.targetTabId) void copyPage();
+    if (tabId === message.targetTabId) void toolbar.copyCurrentPage();
   });
 });
+
+function handlePageCopyShortcut(event: KeyboardEvent): void {
+  if (
+    !session.snapshot.document ||
+    !isPageCopyShortcut(event) ||
+    shouldKeepNativeCopy(event.target)
+  ) {
+    return;
+  }
+  event.preventDefault();
+  void toolbar.copyCurrentPage();
+}
+
+function shouldKeepNativeCopy(target: EventTarget | null): boolean {
+  if (
+    target instanceof Element &&
+    target.closest('input, textarea, select, [contenteditable="true"]')
+  ) {
+    return true;
+  }
+  const selection = window.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.toString());
+}
 
 async function currentTabId(): Promise<number | undefined> {
   try {

@@ -9,6 +9,7 @@ export type ToolbarActions = {
 
 export class DocumentToolbar {
   readonly #root: HTMLElement;
+  readonly #copyPage: ToolbarActions["copyPage"];
   readonly #copyButton: HTMLButtonElement;
   readonly #pdfButton: HTMLButtonElement;
   readonly #translateButton: HTMLButtonElement;
@@ -18,6 +19,7 @@ export class DocumentToolbar {
 
   constructor(root: HTMLElement, actions: ToolbarActions) {
     this.#root = root;
+    this.#copyPage = actions.copyPage;
     this.#copyButton = this.#require("#copy-page");
     this.#pdfButton = this.#require("#extract-pdf");
     this.#translateButton = this.#require("#translate-page");
@@ -29,10 +31,7 @@ export class DocumentToolbar {
       () => this.#pdfButton.setAttribute("aria-expanded", "false"),
     );
 
-    this.#copyButton.addEventListener(
-      "click",
-      () => void this.#busy(this.#copyButton, actions.copyPage),
-    );
+    this.#copyButton.addEventListener("click", () => void this.copyCurrentPage());
     this.#pdfButton.addEventListener("click", () => {
       if (this.#popover.isOpen) {
         this.#popover.close();
@@ -56,6 +55,11 @@ export class DocumentToolbar {
   setTranslationOpen(open: boolean): void {
     this.#translateButton.setAttribute("aria-expanded", String(open));
     this.#translateButton.classList.toggle("is-active", open);
+  }
+
+  copyCurrentPage(): Promise<void> {
+    if (this.#copyButton.disabled) return Promise.resolve();
+    return this.#busy(this.#copyButton, this.#copyPage);
   }
 
   async #busy(button: HTMLButtonElement, operation: () => Promise<void>): Promise<void> {

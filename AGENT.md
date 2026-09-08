@@ -202,7 +202,7 @@ Manifest commands:
 
 - `copy-current-page`: suggested macOS `Command+Shift+C`, other platforms `Ctrl+Shift+C`
 
-Commands target an active PDF Read Helper viewer and show an in-viewer error if no document is loaded. Users can remap at `chrome://extensions/shortcuts`. Chrome may reject/conflict with suggested shortcuts; this requires manual verification.
+Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke the same busy-state-managed action as the IMG button. The viewer preserves native copy when focus is in an input, textarea, select, or editable element, or when the user has selected text. Repeated or already-handled key events and shortcuts with Shift/Alt are ignored. Manifest commands target an active PDF Read Helper viewer and show an in-viewer error if no document is loaded. Users can remap the Shift variant at `chrome://extensions/shortcuts`. Chrome may reject/conflict with suggested manifest shortcuts; this requires manual verification.
 
 ## 16. PDF Loading Strategy
 
@@ -345,12 +345,13 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 41 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 43 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
 - [x] Coordinated toolbar/sidebar overlap spacing and persistent saved-document drag ordering
 - [x] Isolated internal shelf reordering from the full-window external-file drop overlay
+- [x] Mapped contextual Ctrl/Command+C to the IMG action while preserving native text/input copy
 
 ### In progress
 
@@ -455,3 +456,9 @@ npm run check
 **Decision:** Activate the full-window PDF drop target only when `DataTransfer.types` contains the browser-standard `Files` entry. Saved-document reordering continues to use `text/plain` and is handled only by the sidebar.
 
 **Reason:** Window-level drag listeners otherwise treat internal shelf reordering as an incoming PDF file and obscure the viewer with the drop overlay.
+
+### 2026-09-09 — Use the native copy chord for page images
+
+**Decision:** Within the viewer, route plain Ctrl/Command+C through the same toolbar operation as IMG unless the user is editing a control or has selected text. Keep the existing configurable Ctrl/Command+Shift+C manifest command.
+
+**Reason:** The current PDF body is canvas-based and has no selectable text layer, so the standard copy chord is otherwise idle while reading. Context checks retain expected browser copy behavior wherever real text is available.

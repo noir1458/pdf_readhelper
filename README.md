@@ -124,9 +124,10 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 
 ## Keyboard shortcuts
 
+- **⌘C** on macOS / **Ctrl+C** elsewhere while viewing the PDF: copy the current page as an image, matching the IMG button. Normal copy is preserved in inputs and when text is selected.
 - **⌘⇧C** on macOS / **Ctrl+Shift+C** elsewhere: copy current page
 
-Commands work while the PDF Read Helper viewer tab is active. Chrome may reserve or conflict with a suggested shortcut. Review or change bindings at `chrome://extensions/shortcuts`.
+The plain copy shortcut works inside the viewer. The Shift variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
 
 ## Local PDFs
 
