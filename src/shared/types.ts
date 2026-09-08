@@ -1,0 +1,25 @@
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
+
+export type PdfSource =
+  | { kind: "local-file"; name: string }
+  | { kind: "remote-url"; url: string }
+  | { kind: "file-url"; url: string };
+
+export type DocumentSnapshot = {
+  source: PdfSource | null;
+  originalBytes: Uint8Array | null;
+  loadingTask: PDFDocumentLoadingTask | null;
+  document: PDFDocumentProxy | null;
+  totalPages: number;
+  currentPage: number;
+  zoom: number;
+  status: "idle" | "loading" | "ready" | "error";
+  error: string | null;
+};
+
+export type PageSlot = {
+  pageNumber: number;
+  element: HTMLElement;
+  canvas: HTMLCanvasElement;
+  label: HTMLElement;
+};

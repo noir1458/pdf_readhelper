@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Read Helper</title>
+    <link rel="stylesheet" href="./viewer.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <button
+        id="toggle-sidebar"
+        class="icon-button sidebar-button"
+        type="button"
+        aria-label="Show sidebar"
+        title="Show sidebar"
+        aria-expanded="false"
+        aria-controls="document-sidebar"
+        disabled
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16" /></svg>
+      </button>
+      <div class="brand">PDF Read Helper</div>
+      <button id="open-file" class="primary" type="button">Open PDF</button>
+      <input id="file-input" type="file" accept="application/pdf,.pdf" hidden />
+      <form id="url-form" class="url-form" aria-label="Open PDF URL">
+        <input
+          id="url-input"
+          type="url"
+          placeholder="https://example.com/paper.pdf"
+          aria-label="PDF URL"
+        />
+        <button type="submit">Open URL</button>
+      </form>
+      <div id="document-toolbar" class="document-toolbar" aria-label="PDF tools" hidden>
+        <button
+          id="copy-page"
+          class="document-tool"
+          type="button"
+          aria-label="Copy current page as PNG"
+          title="Copy current page as PNG"
+        >
+          <span class="tool-icon" aria-hidden="true">IMG</span><span class="tool-name">Copy</span>
+        </button>
+        <button
+          id="extract-pdf"
+          class="document-tool"
+          type="button"
+          aria-label="Extract page range as PDF"
+          title="Extract page range as PDF"
+          aria-expanded="false"
+          aria-controls="range-popover"
+        >
+          <span class="tool-icon" aria-hidden="true">PDF</span><span class="tool-name">Range</span>
+        </button>
+        <div id="range-popover" class="range-popover" hidden>
+          <form id="range-form">
+            <div class="range-popover-header">
+              <label for="range-input">Page or range</label>
+              <button
+                id="close-range-popover"
+                class="popover-close"
+                type="button"
+                aria-label="Close page range"
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
+            <input id="range-input" inputmode="numeric" placeholder="2-11" autocomplete="off" />
+            <button type="submit">Save PDF</button>
+            <small>Examples: 7 or 2-11</small>
+          </form>
+        </div>
+      </div>
+      <nav class="viewer-controls" aria-label="PDF navigation">
+        <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+        <button
+          id="fit-height"
+          class="icon-button"
+          type="button"
+          aria-label="Fit page height"
+          title="Fit page height"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 3h10M7 21h10M12 5v14M9 8l3-3 3 3M9 16l3 3 3-3" />
+          </svg>
+        </button>
+        <button
+          id="fit-width"
+          class="icon-button"
+          type="button"
+          aria-label="Fit page width"
+          title="Fit page width"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 7v10M21 7v10M5 12h14M8 9l-3 3 3 3M16 9l3 3-3 3" />
+          </svg>
+        </button>
+        <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+        <label class="page-field">
+          <span class="sr-only">Current page</span>
+          <input id="page-input" type="number" min="1" value="1" aria-label="Current page" />
+          <span>/ <span id="total-pages">0</span></span>
+        </label>
+      </nav>
+    </header>
+
+    <div class="viewer-shell">
+      <aside id="document-sidebar" class="document-sidebar" aria-label="Document navigation" hidden>
+        <div class="sidebar-tabs" role="tablist" aria-label="Sidebar view">
+          <button
+            id="thumbnails-tab"
+            class="sidebar-tab icon-button"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="thumbnails-panel"
+            aria-label="Page thumbnails"
+            title="Page thumbnails"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 4h16v16H4zM7 7h10v6H7zM7 16h6" />
+            </svg>
+          </button>
+          <button
+            id="outline-tab"
+            class="sidebar-tab icon-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="outline-panel"
+            aria-label="Table of contents"
+            title="Table of contents"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />
+            </svg>
+          </button>
+          <button
+            id="documents-tab"
+            class="sidebar-tab icon-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="documents-panel"
+            aria-label="Saved documents"
+            title="Saved documents"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4h12v15H7zM4 7v13h11" />
+            </svg>
+          </button>
+        </div>
+        <section
+          id="thumbnails-panel"
+          class="sidebar-panel"
+          role="tabpanel"
+          aria-labelledby="thumbnails-tab"
+        >
+          <div id="thumbnails-list" class="thumbnails-list"></div>
+        </section>
+        <section
+          id="outline-panel"
+          class="sidebar-panel"
+          role="tabpanel"
+          aria-labelledby="outline-tab"
+          hidden
+        >
+          <div id="outline-list" class="outline-list"></div>
+        </section>
+        <section
+          id="documents-panel"
+          class="sidebar-panel"
+          role="tabpanel"
+          aria-labelledby="documents-tab"
+          hidden
+        >
+          <div id="documents-list" class="documents-list"></div>
+        </section>
+      </aside>
+
+      <main id="viewer-scroller" class="viewer-scroller" tabindex="0">
+        <section id="empty-state" class="empty-state">
+          <div class="empty-card">
+            <div class="document-mark" aria-hidden="true">PDF</div>
+            <h1>Read without the handoff friction.</h1>
+            <p>Open or drop a PDF. Pages stay on this device.</p>
+            <button id="empty-open-file" class="primary" type="button">Choose a PDF</button>
+            <p class="drop-hint">or drag and drop it anywhere</p>
+          </div>
+        </section>
+        <section id="loading-state" class="loading-state" hidden aria-live="polite">
+          <div class="spinner" aria-hidden="true"></div>
+          <p>Opening PDF…</p>
+        </section>
+        <section id="page-stack" class="page-stack" aria-label="PDF pages"></section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="drop-overlay" class="drop-overlay" hidden>Drop PDF to open</div>
+
+    <script type="module" src="./viewer.ts"></script>
+  </body>
+</html>

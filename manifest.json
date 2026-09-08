@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "PDF Read Helper",
+  "version": "0.1.0",
+  "description": "Copy PDF pages as PNG and extract page ranges locally.",
+  "minimum_chrome_version": "120",
+  "action": {
+    "default_title": "PDF Read Helper",
+    "default_popup": "src/popup/popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "tabs", "downloads", "commands", "clipboardWrite"],
+  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
+  "commands": {
+    "copy-current-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+C",
+        "mac": "Command+Shift+C"
+      },
+      "description": "Copy the current PDF page as PNG"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}
