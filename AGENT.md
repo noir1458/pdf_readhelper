@@ -178,7 +178,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 - `IntersectionObserver` renders visible and nearby pages.
 - A separate bounded observer lazily renders only nearby sidebar thumbnails.
 - A bounded render window releases distant canvases and calls `PDFPageProxy.cleanup()` after render work is complete.
-- Render jobs are cancellable and stale results do not overwrite current state.
+- Render jobs are registered before asynchronous page lookup, deduplicated per page, and cancellable. Zoom changes wait for an invalidated render to settle before reusing its canvas; disposed document renderers cannot restart, surface stale errors, or mutate the next document.
 - Display resolution accounts for `devicePixelRatio`, subject to a pixel cap.
 - Export uses an independent scale (default `2.0`) and a maximum pixel count to prevent oversized-page memory spikes.
 - Export margin detection uses a separate low-resolution render capped at 640 pixels on its longest side.
@@ -345,8 +345,9 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 35 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 37 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
+- [x] Serialized per-page canvas rendering across document switches and zoom changes
 
 ### In progress
 
@@ -427,3 +428,9 @@ npm run check
 **Decision:** After pointer leave, animate non-page toolbar controls upward without removing their layout slots, leaving translucent IMG/PDF/AI actions and the page field at the exact same coordinates they occupy when expanded. Restore the full toolbar through a 14px full-width top-edge hover target or keyboard focus. Turn the enabled left sidebar into a 48px rail whose content expands as an overlay on hover/focus.
 
 **Reason:** Persistent document-opening and navigation controls consumed reading space after a PDF was already open. Retaining layout slots prevents the always-visible controls from jumping when the bar changes state, while the wider reveal strip and matched motion make recovery predictable.
+
+### 2026-09-08 — Serialize display-canvas rendering
+
+**Decision:** Register each page render before awaiting PDF.js page lookup, share duplicate requests for the same page, wait for invalidated work to settle before reusing its canvas, and permanently dispose renderers when switching documents.
+
+**Reason:** Intersection, navigation, and zoom events can request the same page concurrently. PDF.js forbids overlapping `render()` operations on one canvas, so cancellation alone is insufficient unless the cancelled task has settled before the canvas is used again.

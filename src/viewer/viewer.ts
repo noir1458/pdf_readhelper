@@ -145,7 +145,7 @@ window.addEventListener("beforeunload", () => {
   flushReadingPosition();
   tracker.disconnect();
   renderObserver?.disconnect();
-  renderer?.releaseAll();
+  renderer?.dispose();
   documentSidebar.dispose();
   void session.destroy();
 });
@@ -212,7 +212,9 @@ async function openBytes(
   translationRequestController = null;
   flushReadingPosition();
   activeDocumentId = null;
-  renderer?.releaseAll();
+  const previousRenderer = renderer;
+  renderer = null;
+  previousRenderer?.dispose();
   renderObserver?.disconnect();
   tracker.disconnect();
   documentSidebar.destroy();
@@ -298,7 +300,8 @@ function observeRendering(): void {
 }
 
 async function renderNear(pageNumber: number): Promise<void> {
-  if (!renderer) return;
+  const activeRenderer = renderer;
+  if (!activeRenderer) return;
   const end = session.snapshot.totalPages;
   const pages: Promise<void>[] = [];
   for (
@@ -306,13 +309,14 @@ async function renderNear(pageNumber: number): Promise<void> {
     page <= Math.min(end, pageNumber + RENDER_RADIUS);
     page += 1
   ) {
-    pages.push(renderer.render(page));
+    pages.push(activeRenderer.render(page));
   }
   const results = await Promise.allSettled(pages);
+  if (renderer !== activeRenderer) return;
   const failure = results.find((result) => result.status === "rejected");
   if (failure?.status === "rejected")
     toast.show(`Page render failed: ${errorMessage(failure.reason)}`, "error");
-  renderer.releaseDistant(session.snapshot.currentPage);
+  activeRenderer.releaseDistant(session.snapshot.currentPage);
 }
 
 function updateCurrentPage(pageNumber: number): void {
