@@ -14,6 +14,7 @@ import { Toast } from "../ui/toast";
 import { UrlPopover } from "../ui/url-popover";
 import { DocumentSession } from "./document-session";
 import { DocumentSidebar } from "./document-sidebar";
+import { hasFileDragType } from "./drag-data";
 import {
   DocumentLibrary,
   documentLibraryId,
@@ -589,28 +590,36 @@ async function extractRange(range: PageRange): Promise<void> {
 }
 
 function handleDragEnter(event: DragEvent): void {
+  if (!isFileDrag(event)) return;
   event.preventDefault();
   dragDepth += 1;
   dropOverlay.hidden = false;
 }
 
 function handleDragOver(event: DragEvent): void {
+  if (!isFileDrag(event)) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
 }
 
 function handleDragLeave(event: DragEvent): void {
+  if (!isFileDrag(event)) return;
   event.preventDefault();
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) dropOverlay.hidden = true;
 }
 
 function handleDrop(event: DragEvent): void {
+  if (!isFileDrag(event)) return;
   event.preventDefault();
   dragDepth = 0;
   dropOverlay.hidden = true;
   const file = event.dataTransfer?.files[0];
   if (file) void openFile(file);
+}
+
+function isFileDrag(event: DragEvent): boolean {
+  return Boolean(event.dataTransfer && hasFileDragType(event.dataTransfer.types));
 }
 
 function requireElement<T extends Element>(selector: string): T {

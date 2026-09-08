@@ -345,11 +345,12 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 39 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 41 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
 - [x] Coordinated toolbar/sidebar overlap spacing and persistent saved-document drag ordering
+- [x] Isolated internal shelf reordering from the full-window external-file drop overlay
 
 ### In progress
 
@@ -448,3 +449,9 @@ npm run check
 **Decision:** Animate sidebar contents below the full toolbar whenever it is expanded. Let the user reorder saved documents using a drag grip and persist numeric sort positions in existing IndexedDB metadata records without a schema migration.
 
 **Reason:** The independent top and left overlays otherwise obscure the first sidebar controls when both are open. A persistent manual document order makes the saved shelf behave like user-controlled tabs rather than a volatile recent-files list.
+
+### 2026-09-09 — Distinguish internal and file drags
+
+**Decision:** Activate the full-window PDF drop target only when `DataTransfer.types` contains the browser-standard `Files` entry. Saved-document reordering continues to use `text/plain` and is handled only by the sidebar.
+
+**Reason:** Window-level drag listeners otherwise treat internal shelf reordering as an incoming PDF file and obscure the viewer with the drop overlay.
