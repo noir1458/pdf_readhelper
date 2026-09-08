@@ -6,7 +6,10 @@ import { isExtensionMessage } from "../shared/messages";
 import { classifyPdfUrl, sourceUrlFromLocation } from "../shared/source";
 import type { PageRange } from "../shared/range";
 import type { PageSlot, PdfSource } from "../shared/types";
+import { OPENAI_TRANSLATION_MODEL, translatePageImage } from "../translation/openai-translation";
+import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
 import { DocumentToolbar } from "../ui/document-toolbar";
+import { TranslationPanel } from "../ui/translation-panel";
 import { Toast } from "../ui/toast";
 import { DocumentSession } from "./document-session";
 import { DocumentSidebar } from "./document-sidebar";
@@ -45,12 +48,14 @@ const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
 const tracker = new PageTracker(scroller, updateCurrentPage);
 const documentLibrary = new DocumentLibrary();
+const translationCache = new TranslationCache();
 const slots = new Map<number, PageSlot>();
 let renderer: PageRenderer | null = null;
 let renderObserver: IntersectionObserver | null = null;
 let dragDepth = 0;
 let activeDocumentId: string | null = null;
 let positionSaveTimer = 0;
+let translationRequestController: AbortController | null = null;
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -76,6 +81,13 @@ const documentSidebar = new DocumentSidebar(
 const toolbar = new DocumentToolbar(requireElement<HTMLElement>("#document-toolbar"), {
   copyPage,
   extractRange,
+  toggleTranslation: toggleTranslationPanel,
+});
+
+const translationPanel = new TranslationPanel(requireElement<HTMLElement>("#translation-panel"), {
+  translate: requestPageTranslation,
+  reportError: (message) => toast.show(message, "error", 6500),
+  openChanged: (open) => toolbar.setTranslationOpen(open),
 });
 
 for (const id of ["#open-file", "#empty-open-file"]) {
@@ -115,6 +127,7 @@ window.addEventListener("dragover", handleDragOver);
 window.addEventListener("dragleave", handleDragLeave);
 window.addEventListener("drop", handleDrop);
 window.addEventListener("beforeunload", () => {
+  translationRequestController?.abort();
   flushReadingPosition();
   tracker.disconnect();
   renderObserver?.disconnect();
@@ -181,6 +194,8 @@ async function openBytes(
   source: PdfSource,
   options: OpenDocumentOptions = {},
 ): Promise<void> {
+  translationRequestController?.abort();
+  translationRequestController = null;
   flushReadingPosition();
   activeDocumentId = null;
   renderer?.releaseAll();
@@ -212,6 +227,7 @@ async function openBytes(
   updateCurrentPage(1);
   activeDocumentId = libraryId;
   documentSidebar.setActiveDocument(libraryId);
+  if (translationPanel.isOpen) void loadCachedTranslation(initialPage);
   toolbar.show(pdfDocument.numPages);
   sidebarToggle.disabled = false;
   documentSidebar.showPanel(options.keepDocumentsPanel ? "documents" : "thumbnails");
@@ -292,6 +308,7 @@ function updateCurrentPage(pageNumber: number): void {
   documentSidebar.setCurrentPage(pageNumber);
   scheduleReadingPositionSave(pageNumber);
   renderer?.releaseDistant(pageNumber);
+  if (translationPanel.isOpen) void loadCachedTranslation(pageNumber);
 }
 
 function navigateFromInput(): void {
@@ -325,8 +342,9 @@ async function openSavedDocument(id: string): Promise<void> {
 }
 
 async function removeSavedDocument(id: string): Promise<void> {
-  await documentLibrary.remove(id);
+  await Promise.all([documentLibrary.remove(id), translationCache.removeDocument(id)]);
   if (activeDocumentId === id) activeDocumentId = null;
+  if (!activeDocumentId) translationPanel.showPage(session.snapshot.currentPage, null);
   await refreshDocumentLibrary();
   toast.show("Removed from saved documents", "success");
 }
@@ -434,6 +452,63 @@ function setSidebarOpen(open: boolean): void {
   sidebarToggle.setAttribute("aria-label", open ? "Hide sidebar" : "Show sidebar");
   sidebarToggle.title = open ? "Hide sidebar" : "Show sidebar";
   if (open) documentSidebar.revealCurrentPage();
+}
+
+function toggleTranslationPanel(): void {
+  if (translationPanel.isOpen) {
+    translationPanel.close();
+    return;
+  }
+  const pageNumber = session.snapshot.currentPage;
+  translationPanel.open(pageNumber);
+  void loadCachedTranslation(pageNumber);
+}
+
+async function loadCachedTranslation(pageNumber: number): Promise<void> {
+  const documentId = activeDocumentId;
+  translationPanel.showPage(pageNumber, null);
+  if (!documentId) return;
+  try {
+    const translation = await translationCache.get(
+      documentId,
+      pageNumber,
+      OPENAI_TRANSLATION_MODEL,
+    );
+    if (
+      translationPanel.isOpen &&
+      activeDocumentId === documentId &&
+      session.snapshot.currentPage === pageNumber
+    ) {
+      translationPanel.showPage(pageNumber, translation);
+    }
+  } catch {
+    toast.show("저장된 번역을 불러오지 못했습니다.", "error");
+  }
+}
+
+async function requestPageTranslation(
+  pageNumber: number,
+  apiKey: string,
+): Promise<CachedPageTranslation> {
+  const documentId = activeDocumentId;
+  if (!documentId) throw new UserFacingError("번역할 PDF가 열려 있지 않습니다.");
+  const pdfDocument = session.requireDocument();
+  translationRequestController?.abort();
+  const controller = new AbortController();
+  translationRequestController = controller;
+  try {
+    const pageImage = await renderPagePng(pdfDocument, pageNumber);
+    const result = await translatePageImage(apiKey, pageImage, pageNumber, controller.signal);
+    return await translationCache.put(
+      documentId,
+      pageNumber,
+      OPENAI_TRANSLATION_MODEL,
+      result.text,
+      result.usage,
+    );
+  } finally {
+    if (translationRequestController === controller) translationRequestController = null;
+  }
 }
 
 async function copyPage(): Promise<void> {

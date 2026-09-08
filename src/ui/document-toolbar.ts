@@ -4,12 +4,14 @@ import { RangePopover } from "./range-popover";
 export type ToolbarActions = {
   copyPage: () => Promise<void>;
   extractRange: (range: PageRange) => Promise<void>;
+  toggleTranslation: () => void;
 };
 
 export class DocumentToolbar {
   readonly #root: HTMLElement;
   readonly #copyButton: HTMLButtonElement;
   readonly #pdfButton: HTMLButtonElement;
+  readonly #translateButton: HTMLButtonElement;
   readonly #popover: RangePopover;
   #currentPage = 1;
   #totalPages = 0;
@@ -18,6 +20,7 @@ export class DocumentToolbar {
     this.#root = root;
     this.#copyButton = this.#require("#copy-page");
     this.#pdfButton = this.#require("#extract-pdf");
+    this.#translateButton = this.#require("#translate-page");
     const popoverElement = this.#root.querySelector<HTMLElement>("#range-popover");
     if (!popoverElement) throw new Error("Missing range popover.");
     this.#popover = new RangePopover(
@@ -38,6 +41,7 @@ export class DocumentToolbar {
       this.#popover.open(this.#currentPage, this.#totalPages);
       this.#pdfButton.setAttribute("aria-expanded", "true");
     });
+    this.#translateButton.addEventListener("click", actions.toggleTranslation);
   }
 
   show(totalPages: number): void {
@@ -47,6 +51,11 @@ export class DocumentToolbar {
 
   setCurrentPage(pageNumber: number): void {
     this.#currentPage = pageNumber;
+  }
+
+  setTranslationOpen(open: boolean): void {
+    this.#translateButton.setAttribute("aria-expanded", String(open));
+    this.#translateButton.classList.toggle("is-active", open);
   }
 
   async #busy(button: HTMLButtonElement, operation: () => Promise<void>): Promise<void> {

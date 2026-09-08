@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PDF Read Helper",
   "version": "0.1.0",
-  "description": "Copy PDF pages as PNG and extract page ranges locally.",
+  "description": "Read, copy, extract, and optionally translate PDF pages.",
   "minimum_chrome_version": "120",
   "action": {
     "default_title": "PDF Read Helper",

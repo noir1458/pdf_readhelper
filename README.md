@@ -1,6 +1,6 @@
 # PDF Read Helper
 
-A private, local-first Chrome extension for reading, copying, and extracting PDF pages. It does not call an LLM API or upload PDF data to a server.
+A private, local-first Chrome extension for reading, copying, extracting, and optionally translating PDF pages. PDF files stay local; an image of the current page is sent to OpenAI only when the user explicitly requests a translation.
 
 ## What it does
 
@@ -18,9 +18,11 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
 - Local pixel-based margin detection, safe content cropping, and 70% output resampling
 - PNG clipboard write with automatic download fallback
+- Right-side Korean translation panel using the OpenAI Responses API
+- Session-memory-only API key and local page translation cache
 - Original PDF page-object extraction, such as `2-11.pdf`
 - Keyboard shortcuts
-- No remote code, analytics, API keys, or backend
+- No remote code, analytics, persistent API-key storage, or backend
 
 ## Install
 
@@ -94,6 +96,17 @@ The image comes from a new PDF.js render of the page. Before the final render, t
 
 Browser tabs, scrollbars, and extension controls are not captured. If the clipboard write fails, `page-N.png` is downloaded instead.
 
+### Translate the current page
+
+1. Click **AI / Translate** in the top toolbar.
+2. Enter your own OpenAI API key. It remains only in this viewer tab's memory and is forgotten when the tab closes.
+3. Click **Translate page**. The locally cropped/resampled current-page PNG is sent to `gpt-5.6-luna` with `detail: high` and `store: false`.
+4. Read the Korean result in the right panel or copy it as text.
+
+Opening the panel or scrolling never sends a request. Results are cached locally by PDF and page, so revisiting a translated page does not incur another request. **Translate again** makes a new billed request and replaces that page's cached result.
+
+OpenAI's production guidance says API keys should not be exposed in browsers or apps. This direct session-only flow is intended solely for the owner's private unpacked extension. Do not use it in a distributed build; introduce a server-side proxy or short-lived credential flow first. Use a dedicated project key with an appropriate spending limit.
+
 ### Extract `2-11.pdf`
 
 1. Click **PDF / Range**.
@@ -132,6 +145,8 @@ Chrome controls this setting; the extension cannot enable it automatically.
 - `@cantoo/pdf-lib` for original page copying
 - Viewer-owned PDF bytes and state
 - IndexedDB-backed saved-document metadata, PDF bytes, cover thumbnail, and last-read page
+- Separate IndexedDB translation cache containing returned text and token counts, never API keys or page images
+- Direct Responses API client for explicitly requested current-page translation
 - Service worker limited to keyboard-command routing
 - Typed message contracts in `src/shared/messages.ts`
 - Lazy rendering with bounded canvas release
@@ -145,17 +160,18 @@ For complete architecture, security policy, decisions, and current status, see [
 - `downloads`: save extracted PDFs and fallback PNGs
 - `commands`: keyboard shortcuts
 - `clipboardWrite`: write PNG after asynchronous page rendering
-- `http://*/*`, `https://*/*`, `file:///*`: fetch a PDF URL chosen by the user, wherever it is hosted
+- `http://*/*`, `https://*/*`, `file:///*`: fetch a user-chosen PDF URL and call `api.openai.com` after an explicit translation request
 
 There are no always-on content scripts and no passive browsing collection.
 
 ## Privacy
 
 - PDF processing happens in the browser.
-- PDF data is not uploaded by this extension.
+- Original PDF bytes are not uploaded. A prepared image of one page is uploaded to OpenAI only when Translate is clicked.
 - Saved PDF copies and reading positions stay in the extension's local IndexedDB.
+- Returned translations and token counts stay in a separate local IndexedDB cache.
 - No analytics or telemetry.
-- No API key or account storage.
+- The OpenAI API key stays only in the current viewer tab's memory and is not persisted.
 
 ## Known limitations
 
@@ -167,6 +183,8 @@ There are no always-on content scripts and no passive browsing collection.
 - PDF bookmarks/outlines and signatures are not guaranteed to survive range extraction.
 - Browser memory still limits extremely large documents/pages despite lazy rendering and pixel caps.
 - Saving many very large PDFs can exhaust Chrome's storage quota; remove unneeded entries from the saved-documents tab.
+- OpenAI translation requires a billed API key and an internet connection. Closing the viewer forgets the key.
+- Direct API-key use is suitable only for this private unpacked copy, not a publicly distributed extension.
 
 ## Manual verification checklist
 
@@ -184,6 +202,10 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears
 - [ ] Confirm normal white-page margins are cropped without cutting headers, footers, or page numbers
 - [ ] Confirm colored covers, blank pages, scanned pages, and dark pages use safe bounds
+- [ ] Open and close the translation panel and confirm that scrolling alone does not send requests
+- [ ] Translate one page with a low-limit test API key and verify Korean output and token counts
+- [ ] Revisit that page and confirm its cached translation loads without another request
+- [ ] Use **Translate again**, **Copy translation**, **Change key**, Escape, and the panel close button
 - [ ] Trigger a denied clipboard and confirm PNG fallback download
 - [ ] Extract `2-11` and confirm exactly ten vector/text pages
 - [ ] Open a public PDF URL
@@ -204,6 +226,10 @@ The server may require a logged-in request, block cross-origin fetches, redirect
 ### Clipboard fails
 
 Keep the reader tab focused and click IMG again. Chrome may deny clipboard access due to browser/OS policy. The extension should download `page-N.png` as a fallback.
+
+### Translation fails
+
+Confirm the API key belongs to an active OpenAI project with available billing/spend limit, then try again. A 401 message indicates a rejected key; a 429 message usually indicates a rate or spending limit. Closing the viewer tab clears the key, so enter it again after reopening.
 
 ### Local file cannot open
 

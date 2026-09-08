@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A local-first Chrome extension for copying PDF pages and extracting page ranges.",
+  "description": "A local-first Chrome extension for reading, copying, extracting, and translating PDF pages.",
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "vite build",
