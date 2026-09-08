@@ -78,6 +78,7 @@ const documentSidebar = new DocumentSidebar(
     navigate: (pageNumber) => navigateToPage(pageNumber),
     openDocument: openSavedDocument,
     removeDocument: removeSavedDocument,
+    reorderDocuments: reorderSavedDocuments,
     reportError: (message) => toast.show(message, "error"),
   },
 );
@@ -371,6 +372,11 @@ async function removeSavedDocument(id: string): Promise<void> {
   toast.show("Removed from saved documents", "success");
 }
 
+async function reorderSavedDocuments(ids: string[]): Promise<void> {
+  await documentLibrary.reorder(ids);
+  await refreshDocumentLibrary();
+}
+
 async function rememberDocument(
   pdfDocument: ReturnType<DocumentSession["requireDocument"]>,
   source: PdfSource,
@@ -397,6 +403,7 @@ async function rememberDocument(
         lastPage: activeDocumentId === id ? session.snapshot.currentPage : initialPage,
         totalPages: pdfDocument.numPages,
         updatedAt: Date.now(),
+        ...(previous?.sortOrder === undefined ? {} : { sortOrder: previous.sortOrder }),
       },
       bytes,
     );

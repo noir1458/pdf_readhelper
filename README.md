@@ -15,7 +15,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
-- Local saved-document shelf with cover thumbnails, filenames, and last-read pages
+- Local saved-document shelf with cover thumbnails, filenames, last-read pages, and persistent drag reordering
 - Per-document page restoration across viewer and browser restarts
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
 - Local pixel-based margin detection, safe content cropping, and 70% output resampling
@@ -86,6 +86,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 ### Saved documents and reading position
 
 - The third sidebar tab lists PDFs previously opened in the reader with a small cover, filename, and last-read page.
+- Drag an entry by its grip to reorder the saved PDFs. The custom order persists across browser restarts.
 - Select an entry to switch documents. The viewer restores that document to its last-read page.
 - Use the entry's `×` button to remove the extension's saved copy. This does not delete the original file.
 - PDFs and page positions are stored locally in the extension's IndexedDB and are never uploaded.
@@ -199,12 +200,12 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Scroll through a 10+ page document and confirm the page counter follows
 - [ ] Open a 100+ page document and inspect that distant canvases are released
 - [ ] Switch between thumbnails and table of contents; navigate with both
-- [ ] Switch between two saved PDFs and verify the cover/title list and restored page
+- [ ] Switch between two saved PDFs, drag them into a new order, and verify the cover/title list, persistent order, and restored page
 - [ ] Reload Chrome and verify that saved documents and last-read pages remain available
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
-- [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls
+- [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls; confirm the expanded toolbar pushes sidebar content below it
 - [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears
 - [ ] Confirm normal white-page margins are cropped without cutting headers, footers, or page numbers

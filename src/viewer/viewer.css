@@ -333,7 +333,11 @@ button:disabled {
   box-shadow: 10px 0 30px rgba(0, 0, 0, 0.24);
   transition:
     width 0.18s ease,
-    box-shadow 0.18s ease;
+    box-shadow 0.18s ease,
+    padding-top 0.22s cubic-bezier(0.2, 0.72, 0.25, 1);
+}
+.topbar:not(.is-compact) ~ .viewer-shell .document-sidebar {
+  padding-top: var(--bar-height);
 }
 .document-sidebar:not(:hover):not(:has(:focus-visible)) {
   width: 48px;
@@ -620,10 +624,28 @@ button:disabled {
 .saved-document {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 26px;
+  grid-template-columns: 18px minmax(0, 1fr) 26px;
   align-items: center;
   border: 1px solid transparent;
   border-radius: 9px;
+}
+.saved-document.is-dragging {
+  opacity: 0.45;
+}
+.saved-document-drag {
+  width: 18px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #7f8792;
+  cursor: grab;
+  user-select: none;
+}
+.saved-document-drag:active {
+  cursor: grabbing;
+}
+.is-reordering .saved-document:not(.is-dragging) {
+  background: rgba(255, 255, 255, 0.025);
 }
 .saved-document:has(.saved-document-open[aria-current="true"]) {
   border-color: rgba(112, 214, 177, 0.55);

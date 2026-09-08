@@ -26,6 +26,7 @@ type SidebarOptions = {
   navigate: (pageNumber: number) => void;
   openDocument: (id: string) => Promise<void>;
   removeDocument: (id: string) => Promise<void>;
+  reorderDocuments: (ids: string[]) => Promise<void>;
   reportError: (message: string) => void;
 };
 
@@ -38,6 +39,7 @@ export class DocumentSidebar {
   readonly #reportError: SidebarOptions["reportError"];
   readonly #openDocument: SidebarOptions["openDocument"];
   readonly #removeDocument: SidebarOptions["removeDocument"];
+  readonly #reorderDocuments: SidebarOptions["reorderDocuments"];
   readonly #thumbnailButtons = new Map<number, HTMLButtonElement>();
   readonly #documentButtons = new Map<string, HTMLButtonElement>();
   readonly #documentObjectUrls: string[] = [];
@@ -46,16 +48,20 @@ export class DocumentSidebar {
   #document: PDFDocumentProxy | null = null;
   #thumbnailObserver: IntersectionObserver | null = null;
   #currentPage = 1;
+  #draggedDocumentId: string | null = null;
 
   constructor(elements: SidebarElements, options: SidebarOptions) {
     this.#elements = elements;
     this.#navigate = options.navigate;
     this.#openDocument = options.openDocument;
     this.#removeDocument = options.removeDocument;
+    this.#reorderDocuments = options.reorderDocuments;
     this.#reportError = options.reportError;
     elements.thumbnailsTab.addEventListener("click", () => this.showPanel("thumbnails"));
     elements.outlineTab.addEventListener("click", () => this.showPanel("outline"));
     elements.documentsTab.addEventListener("click", () => this.showPanel("documents"));
+    elements.documentsList.addEventListener("dragover", this.#dragDocumentOver);
+    elements.documentsList.addEventListener("drop", this.#dropDocument);
   }
 
   async setDocument(document: PDFDocumentProxy): Promise<void> {
@@ -111,6 +117,23 @@ export class DocumentSidebar {
       row.className = "saved-document";
       row.dataset.documentId = savedDocument.id;
 
+      const dragHandle = document.createElement("span");
+      dragHandle.className = "saved-document-drag";
+      dragHandle.textContent = "⠿";
+      dragHandle.title = `Drag to reorder ${savedDocument.title}`;
+      dragHandle.setAttribute("aria-label", `Drag to reorder ${savedDocument.title}`);
+      dragHandle.draggable = true;
+      dragHandle.addEventListener("dragstart", (event) => {
+        this.#draggedDocumentId = savedDocument.id;
+        row.classList.add("is-dragging");
+        this.#elements.documentsList.classList.add("is-reordering");
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", savedDocument.id);
+        }
+      });
+      dragHandle.addEventListener("dragend", () => this.#finishDocumentDrag());
+
       const openButton = document.createElement("button");
       openButton.className = "saved-document-open";
       openButton.type = "button";
@@ -155,7 +178,7 @@ export class DocumentSidebar {
         void this.#runDocumentAction(removeButton, () => this.#removeDocument(savedDocument.id));
       });
 
-      row.append(openButton, removeButton);
+      row.append(dragHandle, openButton, removeButton);
       this.#documentButtons.set(savedDocument.id, openButton);
       fragment.append(row);
     }
@@ -402,6 +425,56 @@ export class DocumentSidebar {
   #scrollCurrentThumbnailIntoView(): void {
     if (this.#elements.root.hidden || this.#elements.thumbnailsPanel.hidden) return;
     this.#thumbnailButtons.get(this.#currentPage)?.scrollIntoView({ block: "nearest" });
+  }
+
+  readonly #dragDocumentOver = (event: DragEvent): void => {
+    if (!this.#draggedDocumentId) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    const draggedRow = this.#documentRow(this.#draggedDocumentId);
+    if (!draggedRow) return;
+    const target =
+      event.target instanceof Element ? event.target.closest<HTMLElement>(".saved-document") : null;
+    if (!target) {
+      this.#elements.documentsList.append(draggedRow);
+      return;
+    }
+    if (target === draggedRow) return;
+    const insertAfter =
+      event.clientY > target.getBoundingClientRect().top + target.offsetHeight / 2;
+    this.#elements.documentsList.insertBefore(
+      draggedRow,
+      insertAfter ? target.nextSibling : target,
+    );
+  };
+
+  readonly #dropDocument = (event: DragEvent): void => {
+    if (!this.#draggedDocumentId) return;
+    event.preventDefault();
+    const ids = [...this.#elements.documentsList.querySelectorAll<HTMLElement>(".saved-document")]
+      .map((row) => row.dataset.documentId)
+      .filter((id): id is string => Boolean(id));
+    void this.#reorderDocuments(ids).catch(() => {
+      this.#reportError("Could not save the document order.");
+    });
+    this.#finishDocumentDrag();
+  };
+
+  #finishDocumentDrag(): void {
+    if (this.#draggedDocumentId) {
+      this.#documentRow(this.#draggedDocumentId)?.classList.remove("is-dragging");
+    }
+    this.#draggedDocumentId = null;
+    this.#elements.documentsList.classList.remove("is-reordering");
+  }
+
+  #documentRow(id: string): HTMLElement | null {
+    for (const row of this.#elements.documentsList.querySelectorAll<HTMLElement>(
+      ".saved-document",
+    )) {
+      if (row.dataset.documentId === id) return row;
+    }
+    return null;
   }
 
   #status(message: string): HTMLParagraphElement {

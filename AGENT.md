@@ -142,7 +142,7 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 - rendered page slots and render lifecycle
 - document-level load/error lifecycle
 
-`DocumentLibrary` owns persistent extension-local IndexedDB records. Metadata and file bytes use separate object stores so listing cover/title/page summaries does not read every saved PDF into memory. Each record includes a PDF fingerprint ID, source descriptor, title, small first-page thumbnail, total pages, last-read page, update timestamp, and locally cached PDF bytes.
+`DocumentLibrary` owns persistent extension-local IndexedDB records. Metadata and file bytes use separate object stores so listing cover/title/page summaries does not read every saved PDF into memory. Each record includes a PDF fingerprint ID, source descriptor, title, small first-page thumbnail, total pages, last-read page, update timestamp, optional user-defined sort order, and locally cached PDF bytes. Legacy records without a sort order remain newest-first until the user drags the list; new unordered documents appear before an existing manual sequence.
 
 `TranslationCache` owns a separate IndexedDB database keyed by capture version, model, PDF fingerprint, and page. It stores translated text, token usage, model name, and update time, but never stores an API key or page image.
 
@@ -192,7 +192,7 @@ The top bar keeps its opening actions on the left and one contiguous page-contro
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
-- The third sidebar view lists locally saved PDFs using small covers, filenames, and last-read page indicators. Selecting one swaps the active document; its remove button deletes only the cached extension copy.
+- The third sidebar view lists locally saved PDFs using small covers, filenames, and last-read page indicators. Selecting one swaps the active document; its remove button deletes only the cached extension copy. A visible grip supports drag reordering, which is persisted in IndexedDB.
 - AI opens a closable right panel. Its key form explains session-only handling and external page-image transmission. Translation never starts from scrolling or merely opening the panel. Cached results appear automatically and can be copied as text; explicit retranslation replaces the cached result.
 - No `alert()`; use non-blocking accessible live-region toasts.
 
@@ -217,7 +217,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Selectable text and annotations/links are deferred from the first stable MVP because PDF.js text/annotation layer APIs change frequently and require version-pinned browser validation. This limitation must remain visible in README/status rather than being implied as complete.
 
@@ -345,10 +345,11 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 37 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 39 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
+- [x] Coordinated toolbar/sidebar overlap spacing and persistent saved-document drag ordering
 
 ### In progress
 
@@ -441,3 +442,9 @@ npm run check
 **Decision:** Keep zoom, fit, IMG/PDF/AI, and the page field in a single right-aligned control group, with page actions directly beside the page field. Preserve URL loading but expose its input through a closable **Open URL** popover.
 
 **Reason:** Page actions and page state are used together and should not be visually separated. URL loading remains useful for public and permitted file URLs, but its text field is an infrequent action that should not permanently consume toolbar width.
+
+### 2026-09-09 — Coordinate overlay chrome and persist shelf order
+
+**Decision:** Animate sidebar contents below the full toolbar whenever it is expanded. Let the user reorder saved documents using a drag grip and persist numeric sort positions in existing IndexedDB metadata records without a schema migration.
+
+**Reason:** The independent top and left overlays otherwise obscure the first sidebar controls when both are open. A persistent manual document order makes the saved shelf behave like user-controlled tabs rather than a volatile recent-files list.

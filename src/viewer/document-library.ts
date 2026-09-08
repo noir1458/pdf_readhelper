@@ -10,6 +10,7 @@ export type SavedDocumentSummary = {
   lastPage: number;
   totalPages: number;
   updatedAt: number;
+  sortOrder?: number;
 };
 
 export type SavedDocument = SavedDocumentSummary & {
@@ -35,7 +36,7 @@ export class DocumentLibrary {
       transaction.objectStore(METADATA_STORE).getAll(),
     );
     await transactionDone(transaction);
-    return records.sort((left, right) => right.updatedAt - left.updatedAt);
+    return sortSavedDocuments(records);
   }
 
   async getMetadata(id: string): Promise<SavedDocumentSummary | null> {
@@ -81,6 +82,23 @@ export class DocumentLibrary {
     await transactionDone(transaction);
   }
 
+  async reorder(ids: string[]): Promise<void> {
+    const database = await this.#database();
+    const transaction = database.transaction(METADATA_STORE, "readwrite");
+    const store = transaction.objectStore(METADATA_STORE);
+    const records = await requestResult<SavedDocumentSummary[]>(store.getAll());
+    const positions = new Map<string, number>();
+    for (const id of ids) {
+      if (!positions.has(id)) positions.set(id, positions.size);
+    }
+    let nextPosition = positions.size;
+    for (const record of records) {
+      const sortOrder = positions.get(record.id) ?? nextPosition++;
+      store.put({ ...record, sortOrder });
+    }
+    await transactionDone(transaction);
+  }
+
   async remove(id: string): Promise<void> {
     const database = await this.#database();
     const transaction = database.transaction([METADATA_STORE, FILE_STORE], "readwrite");
@@ -108,6 +126,16 @@ export class DocumentLibrary {
     });
     return this.#databasePromise;
   }
+}
+
+export function sortSavedDocuments(records: SavedDocumentSummary[]): SavedDocumentSummary[] {
+  return records.sort((left, right) => {
+    const leftHasOrder = Number.isFinite(left.sortOrder);
+    const rightHasOrder = Number.isFinite(right.sortOrder);
+    if (leftHasOrder && rightHasOrder) return (left.sortOrder ?? 0) - (right.sortOrder ?? 0);
+    if (leftHasOrder !== rightHasOrder) return leftHasOrder ? 1 : -1;
+    return right.updatedAt - left.updatedAt;
+  });
 }
 
 export function documentLibraryId(document: PDFDocumentProxy, source: PdfSource): string {
