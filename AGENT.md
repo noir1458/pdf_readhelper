@@ -352,6 +352,7 @@ npm run check
 - [x] Coordinated toolbar/sidebar overlap spacing and persistent saved-document drag ordering
 - [x] Isolated internal shelf reordering from the full-window external-file drop overlay
 - [x] Mapped contextual Ctrl/Command+C to the IMG action while preserving native text/input copy
+- [x] Added a paper/PDF brand icon as a vector source, Chrome icon PNG sizes, and viewer/popup favicon
 
 ### In progress
 
@@ -462,3 +463,9 @@ npm run check
 **Decision:** Within the viewer, route plain Ctrl/Command+C through the same toolbar operation as IMG unless the user is editing a control or has selected text. Keep the existing configurable Ctrl/Command+Shift+C manifest command.
 
 **Reason:** The current PDF body is canvas-based and has no selectable text layer, so the standard copy chord is otherwise idle while reading. Context checks retain expected browser copy behavior wherever real text is available.
+
+### 2026-09-09 — Use one vector source for extension identity
+
+**Decision:** Keep a font-independent SVG master showing a folded paper sheet and PDF label, and generate 16, 32, 48, and 128px PNG variants for Chrome's manifest/action icons. Use the 32px asset as the popup and viewer favicon.
+
+**Reason:** Chrome needs raster icon sizes while browser tabs need a favicon. A single vector source keeps the dark-and-mint product mark consistent and avoids platform font differences during asset generation.
