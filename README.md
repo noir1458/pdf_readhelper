@@ -70,13 +70,14 @@ npm run format
 
 - Click the extension and choose **Open empty reader**, then use **Open PDF**.
 - Drag a local PDF onto the reader.
-- Paste a public PDF URL into the reader.
+- Click **Open URL** to reveal the compact URL form, then paste a public PDF URL.
 - When the active tab URL ends in `.pdf`, click the extension and choose **Open current PDF**.
 
 Authenticated, expiring, referrer-restricted, or special web viewers may not expose fetchable PDF bytes. Download those PDFs and open the local file instead.
 
 ### Navigate and fit pages
 
+- The right control group is ordered as zoom out, zoom in, fit height, fit width, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
@@ -201,6 +202,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Switch between two saved PDFs and verify the cover/title list and restored page
 - [ ] Reload Chrome and verify that saved documents and last-read pages remain available
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
+- [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
 - [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls
 - [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
@@ -213,7 +215,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Use **Translate again**, **Copy translation**, **Change key**, Escape, and the panel close button
 - [ ] Trigger a denied clipboard and confirm PNG fallback download
 - [ ] Extract `2-11` and confirm exactly ten vector/text pages
-- [ ] Open a public PDF URL
+- [ ] Open a public PDF URL from the on-demand URL popover
 - [ ] Enable file URL access and test a direct `file://` PDF
 - [ ] Test and remap the copy-page keyboard shortcut
 - [ ] Check the extension/service-worker console for worker or CSP errors

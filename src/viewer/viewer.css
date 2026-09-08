@@ -69,7 +69,7 @@ input:focus-visible {
 .topbar .sidebar-button,
 .topbar .brand,
 .topbar #open-file,
-.topbar .url-form,
+.topbar .url-launcher,
 .topbar .viewer-controls > button {
   transition:
     transform 0.22s cubic-bezier(0.2, 0.72, 0.25, 1),
@@ -79,7 +79,7 @@ input:focus-visible {
 .topbar.is-compact .sidebar-button,
 .topbar.is-compact .brand,
 .topbar.is-compact #open-file,
-.topbar.is-compact .url-form,
+.topbar.is-compact .url-launcher,
 .topbar.is-compact .viewer-controls > button {
   visibility: hidden;
   opacity: 0;
@@ -169,22 +169,47 @@ button:disabled {
 .primary:hover {
   background: var(--accent-strong);
 }
-.url-form {
-  display: flex;
-  gap: 6px;
-  flex: 1;
-  min-width: 180px;
-  max-width: 650px;
+.url-launcher {
+  position: relative;
+  flex: 0 0 auto;
 }
-.url-form input {
+.url-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 31;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #202329;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+.url-popover form {
+  display: grid;
+  gap: 8px;
+}
+.url-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.url-popover label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.url-popover input {
   width: 100%;
-  min-width: 100px;
-  height: 34px;
+  height: 38px;
   padding: 0 10px;
   color: #f5f7fa;
   background: #111318;
   border: 1px solid var(--border);
   border-radius: 9px;
+}
+.url-popover small {
+  color: var(--muted);
 }
 .viewer-controls {
   display: flex;
@@ -860,7 +885,7 @@ button:disabled {
 
 @media (max-width: 760px) {
   .brand,
-  .url-form {
+  .url-launcher {
     display: none;
   }
   .topbar {

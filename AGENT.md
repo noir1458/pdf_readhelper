@@ -87,7 +87,7 @@ pdf_readhelper/
 │   ├── popup/{popup.html,popup.ts,popup.css}
 │   ├── shared/{constants,errors,filename,messages,range,source,types}.ts
 │   ├── translation/{openai-translation,translation-cache}.ts
-│   ├── ui/{document-toolbar,range-popover,toast,translation-panel}.ts
+│   ├── ui/{document-toolbar,range-popover,toast,translation-panel,url-popover}.ts
 │   └── viewer/
 │       ├── viewer.html
 │       ├── viewer.ts
@@ -188,7 +188,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar contains a compact document toolbar with **IMG / Copy**, **PDF / Range**, and **AI / Translate** controls. It appears after a document loads and keeps page actions together with navigation. When idle, non-page controls animate upward while the remaining actions/page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -217,7 +217,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. When the pointer leaves the full top toolbar, non-page controls slide upward while IMG, PDF, AI, and current/total page remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page. Canvas page and thumbnail rendering is lazy and bounded.
 
 Selectable text and annotations/links are deferred from the first stable MVP because PDF.js text/annotation layer APIs change frequently and require version-pinned browser validation. This limitation must remain visible in README/status rather than being implied as complete.
 
@@ -348,6 +348,7 @@ npm run check
 - [x] Automated typecheck, lint, 37 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
+- [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
 
 ### In progress
 
@@ -434,3 +435,9 @@ npm run check
 **Decision:** Register each page render before awaiting PDF.js page lookup, share duplicate requests for the same page, wait for invalidated work to settle before reusing its canvas, and permanently dispose renderers when switching documents.
 
 **Reason:** Intersection, navigation, and zoom events can request the same page concurrently. PDF.js forbids overlapping `render()` operations on one canvas, so cancellation alone is insufficient unless the cancelled task has settled before the canvas is used again.
+
+### 2026-09-09 — Consolidate toolbar controls and defer URL input
+
+**Decision:** Keep zoom, fit, IMG/PDF/AI, and the page field in a single right-aligned control group, with page actions directly beside the page field. Preserve URL loading but expose its input through a closable **Open URL** popover.
+
+**Reason:** Page actions and page state are used together and should not be visually separated. URL loading remains useful for public and permitted file URLs, but its text field is an infrequent action that should not permanently consume toolbar width.

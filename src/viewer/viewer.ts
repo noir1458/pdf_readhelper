@@ -11,6 +11,7 @@ import { TranslationCache, type CachedPageTranslation } from "../translation/tra
 import { DocumentToolbar } from "../ui/document-toolbar";
 import { TranslationPanel } from "../ui/translation-panel";
 import { Toast } from "../ui/toast";
+import { UrlPopover } from "../ui/url-popover";
 import { DocumentSession } from "./document-session";
 import { DocumentSidebar } from "./document-sidebar";
 import {
@@ -93,6 +94,12 @@ const translationPanel = new TranslationPanel(requireElement<HTMLElement>("#tran
   openChanged: (open) => toolbar.setTranslationOpen(open),
 });
 
+new UrlPopover(
+  requireElement<HTMLElement>("#url-popover"),
+  requireElement<HTMLButtonElement>("#open-url"),
+  openUrl,
+);
+
 for (const id of ["#open-file", "#empty-open-file"]) {
   requireElement<HTMLButtonElement>(id).addEventListener("click", () => fileInput.click());
 }
@@ -100,10 +107,6 @@ fileInput.addEventListener("change", () => {
   const file = fileInput.files?.[0];
   if (file) void openFile(file);
   fileInput.value = "";
-});
-requireElement<HTMLFormElement>("#url-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  if (urlInput.value.trim()) void openUrl(urlInput.value);
 });
 requireElement<HTMLButtonElement>("#zoom-in").addEventListener("click", () =>
   setZoom(session.snapshot.zoom + VIEW_SCALE_STEP),
