@@ -12,6 +12,8 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Local PDF picker and drag-and-drop
 - Public HTTP(S) and direct `file://` PDF loading where Chrome permits it
 - Current-page detection, page navigation, zoom, fit-width, and fit-height
+- Selectable PDF text with native copy behavior
+- Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
@@ -77,7 +79,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The right control group is ordered as zoom out, zoom in, fit height, fit width, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
+- The right control group is ordered as zoom out, zoom in, fit height, fit width, search, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
@@ -124,6 +126,7 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 
 ## Keyboard shortcuts
 
+- **⌘F** on macOS / **Ctrl+F** elsewhere: search all text-bearing pages in the current PDF. Enter moves forward and Shift+Enter moves backward.
 - **⌘C** on macOS / **Ctrl+C** elsewhere while viewing the PDF: copy the current page as an image, matching the IMG button. Normal copy is preserved in inputs and when text is selected.
 - **⌘⇧C** on macOS / **Ctrl+Shift+C** elsewhere: copy current page
 
@@ -184,7 +187,8 @@ There are no always-on content scripts and no passive browsing collection.
 - Chrome's built-in PDF viewer is not modified; PDFs open in the extension's reader.
 - Public PDF fetch can fail due to CORS, authentication, session, or anti-hotlink rules.
 - `file://` access requires the manual Chrome setting above.
-- Selectable text and annotation/link layers are not included in the first stable MVP.
+- Scanned/image-only pages have no selectable or searchable text unless the PDF itself contains an OCR text layer.
+- Annotation and clickable-link layers are not included yet.
 - Encrypted PDFs are not supported. Signed, malformed, form-heavy, or unusual annotated PDFs may not extract perfectly.
 - PDF bookmarks/outlines and signatures are not guaranteed to survive range extraction.
 - Browser memory still limits extremely large documents/pages despite lazy rendering and pixel caps.
@@ -206,6 +210,8 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
+- [ ] Select PDF text, press ⌘C/Ctrl+C, and confirm native text—not a page PNG—is copied
+- [ ] Open search with ⌘F/Ctrl+F, find a phrase across the full document, and navigate forward/backward with Enter/Shift+Enter and the arrow buttons
 - [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls; confirm the expanded toolbar pushes sidebar content below it
 - [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears

@@ -27,6 +27,7 @@ import { loadLocalFile, loadPdfUrl } from "./pdf-loader";
 import { renderPagePng } from "./page-exporter";
 import { PageRenderer } from "./page-renderer";
 import { PageTracker } from "./page-tracker";
+import { PdfDocumentSearch, type PdfSearchMatch } from "./pdf-search";
 import { extractPdfRange } from "./range-extractor";
 import { fittedScale, type FitMode } from "./render-math";
 import {
@@ -50,6 +51,12 @@ const topbar = requireElement<HTMLElement>(".topbar");
 const topbarRevealZone = requireElement<HTMLElement>("#topbar-reveal-zone");
 const sidebar = requireElement<HTMLElement>("#document-sidebar");
 const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
+const searchButton = requireElement<HTMLButtonElement>("#search-pdf");
+const searchPopover = requireElement<HTMLElement>("#search-popover");
+const searchInput = requireElement<HTMLInputElement>("#search-input");
+const searchStatus = requireElement<HTMLElement>("#search-status");
+const searchPrevious = requireElement<HTMLButtonElement>("#search-previous");
+const searchNext = requireElement<HTMLButtonElement>("#search-next");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
 const tracker = new PageTracker(scroller, updateCurrentPage);
 const documentLibrary = new DocumentLibrary();
@@ -62,6 +69,11 @@ let activeDocumentId: string | null = null;
 let positionSaveTimer = 0;
 let translationRequestController: AbortController | null = null;
 let topbarCollapseTimer = 0;
+let searchTimer = 0;
+let documentSearch: PdfDocumentSearch | null = null;
+let searchController: AbortController | null = null;
+let searchMatches: PdfSearchMatch[] = [];
+let activeSearchMatch = -1;
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -130,7 +142,19 @@ pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") navigateFromInput();
 });
+searchButton.addEventListener("click", toggleSearch);
+requireElement<HTMLButtonElement>("#close-search").addEventListener("click", closeSearch);
+searchPrevious.addEventListener("click", () => void moveSearchResult(-1));
+searchNext.addEventListener("click", () => void moveSearchResult(1));
+searchInput.addEventListener("input", scheduleSearch);
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  if (searchMatches.length > 0) void moveSearchResult(event.shiftKey ? -1 : 1);
+  else void runSearch();
+});
 document.addEventListener("keydown", handlePageCopyShortcut);
+document.addEventListener("keydown", handlePdfSearchShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
 topbar.addEventListener("focusin", (event) => {
@@ -149,6 +173,7 @@ window.addEventListener("dragleave", handleDragLeave);
 window.addEventListener("drop", handleDrop);
 window.addEventListener("beforeunload", () => {
   translationRequestController?.abort();
+  searchController?.abort();
   flushReadingPosition();
   tracker.disconnect();
   renderObserver?.disconnect();
@@ -177,6 +202,23 @@ function handlePageCopyShortcut(event: KeyboardEvent): void {
   }
   event.preventDefault();
   void toolbar.copyCurrentPage();
+}
+
+function handlePdfSearchShortcut(event: KeyboardEvent): void {
+  if (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.shiftKey ||
+    !(event.ctrlKey || event.metaKey) ||
+    event.key.toLowerCase() !== "f" ||
+    !session.snapshot.document
+  ) {
+    if (event.key === "Escape" && !searchPopover.hidden) closeSearch();
+    return;
+  }
+  event.preventDefault();
+  openSearch();
 }
 
 function shouldKeepNativeCopy(target: EventTarget | null): boolean {
@@ -240,6 +282,7 @@ async function openBytes(
 ): Promise<void> {
   translationRequestController?.abort();
   translationRequestController = null;
+  resetSearch();
   flushReadingPosition();
   activeDocumentId = null;
   const previousRenderer = renderer;
@@ -254,6 +297,7 @@ async function openBytes(
   pageStack.replaceChildren();
 
   const pdfDocument = await session.load(bytes, source);
+  documentSearch = new PdfDocumentSearch(pdfDocument);
   const libraryId = options.savedMetadata?.id ?? documentLibraryId(pdfDocument, source);
   let savedMetadata = options.savedMetadata;
   if (!savedMetadata) {
@@ -277,6 +321,7 @@ async function openBytes(
   toolbar.show(pdfDocument.numPages);
   scheduleTopbarCollapse();
   sidebarToggle.disabled = false;
+  searchButton.disabled = false;
   documentSidebar.showPanel(options.keepDocumentsPanel ? "documents" : "thumbnails");
   void documentSidebar.setDocument(pdfDocument);
   setSidebarOpen(true);
@@ -305,12 +350,15 @@ function createSlots(count: number): void {
     element.dataset.pageNumber = String(pageNumber);
     element.setAttribute("aria-label", `Page ${pageNumber}`);
     const canvas = document.createElement("canvas");
+    const textLayer = document.createElement("div");
+    textLayer.className = "textLayer";
+    textLayer.tabIndex = 0;
     const label = document.createElement("span");
     label.className = "page-label";
     label.textContent = String(pageNumber);
-    element.append(canvas, label);
+    element.append(canvas, textLayer, label);
     fragment.append(element);
-    slots.set(pageNumber, { pageNumber, element, canvas, label });
+    slots.set(pageNumber, { pageNumber, element, canvas, textLayer, label });
   }
   pageStack.append(fragment);
 }
@@ -375,6 +423,120 @@ function navigateToPage(target: number, behavior: ScrollBehavior = "smooth"): bo
   updateCurrentPage(target);
   void renderNear(target);
   return true;
+}
+
+function toggleSearch(): void {
+  if (searchPopover.hidden) openSearch();
+  else closeSearch();
+}
+
+function openSearch(): void {
+  if (!documentSearch) return;
+  showFullTopbar();
+  searchPopover.hidden = false;
+  searchButton.setAttribute("aria-expanded", "true");
+  window.requestAnimationFrame(() => {
+    searchInput.focus();
+    searchInput.select();
+  });
+  if (searchInput.value.trim() && searchMatches.length === 0) scheduleSearch();
+}
+
+function closeSearch(): void {
+  window.clearTimeout(searchTimer);
+  searchController?.abort();
+  searchController = null;
+  searchPopover.hidden = true;
+  searchButton.setAttribute("aria-expanded", "false");
+  searchMatches = [];
+  activeSearchMatch = -1;
+  renderer?.setSearchMatches([], -1);
+  scroller.focus({ preventScroll: true });
+  scheduleTopbarCollapse();
+}
+
+function resetSearch(): void {
+  window.clearTimeout(searchTimer);
+  searchController?.abort();
+  searchController = null;
+  documentSearch = null;
+  searchMatches = [];
+  activeSearchMatch = -1;
+  searchInput.value = "";
+  searchStatus.textContent = "Type to search";
+  searchPrevious.disabled = true;
+  searchNext.disabled = true;
+  searchButton.disabled = true;
+  searchPopover.hidden = true;
+  searchButton.setAttribute("aria-expanded", "false");
+}
+
+function scheduleSearch(): void {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => void runSearch(), 180);
+}
+
+async function runSearch(): Promise<void> {
+  const search = documentSearch;
+  const query = searchInput.value;
+  searchController?.abort();
+  const controller = new AbortController();
+  searchController = controller;
+  searchMatches = [];
+  activeSearchMatch = -1;
+  renderer?.setSearchMatches([], -1);
+  searchPrevious.disabled = true;
+  searchNext.disabled = true;
+
+  if (!search || !query.trim()) {
+    searchStatus.textContent = "Type to search";
+    return;
+  }
+
+  searchStatus.textContent = `Searching 0 / ${session.snapshot.totalPages} pages…`;
+  try {
+    const matches = await search.search(query, controller.signal, (completed, total) => {
+      if (searchController === controller) {
+        searchStatus.textContent = `Searching ${completed} / ${total} pages…`;
+      }
+    });
+    if (searchController !== controller || controller.signal.aborted) return;
+    searchMatches = matches;
+    if (matches.length === 0) {
+      searchStatus.textContent = "No results";
+      return;
+    }
+    const fromCurrentPage = matches.findIndex(
+      (match) => match.pageNumber >= session.snapshot.currentPage,
+    );
+    activeSearchMatch = fromCurrentPage >= 0 ? fromCurrentPage : 0;
+    searchPrevious.disabled = false;
+    searchNext.disabled = false;
+    await showActiveSearchMatch();
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    searchStatus.textContent = "Search failed";
+    toast.show(`Could not search PDF: ${errorMessage(error)}`, "error");
+  }
+}
+
+async function moveSearchResult(delta: number): Promise<void> {
+  if (searchMatches.length === 0) return;
+  activeSearchMatch = (activeSearchMatch + delta + searchMatches.length) % searchMatches.length;
+  await showActiveSearchMatch();
+}
+
+async function showActiveSearchMatch(): Promise<void> {
+  const match = searchMatches[activeSearchMatch];
+  const activeRenderer = renderer;
+  if (!match || !activeRenderer) return;
+  searchStatus.textContent = `${activeSearchMatch + 1} / ${searchMatches.length} · page ${match.pageNumber}`;
+  activeRenderer.setSearchMatches(searchMatches, activeSearchMatch);
+  navigateToPage(match.pageNumber, "auto");
+  await activeRenderer.render(match.pageNumber);
+  if (renderer === activeRenderer && searchMatches[activeSearchMatch] === match) {
+    activeRenderer.revealSearchMatch(match);
+  }
 }
 
 async function openSavedDocument(id: string): Promise<void> {
@@ -513,7 +675,8 @@ function scheduleTopbarCollapse(): void {
   window.clearTimeout(topbarCollapseTimer);
   if (!session.snapshot.document) return;
   topbarCollapseTimer = window.setTimeout(() => {
-    if (topbar.matches(":hover") || topbar.querySelector(":focus-visible")) return;
+    if (topbar.matches(":hover") || topbar.querySelector(":focus-visible") || !searchPopover.hidden)
+      return;
     topbar.classList.add("is-compact");
   }, 450);
 }

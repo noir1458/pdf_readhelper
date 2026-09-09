@@ -188,7 +188,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, search, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -203,6 +203,8 @@ Manifest commands:
 - `copy-current-page`: suggested macOS `Command+Shift+C`, other platforms `Ctrl+Shift+C`
 
 Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke the same busy-state-managed action as the IMG button. The viewer preserves native copy when focus is in an input, textarea, select, or editable element, or when the user has selected text. Repeated or already-handled key events and shortcuts with Shift/Alt are ignored. Manifest commands target an active PDF Read Helper viewer and show an in-viewer error if no document is loaded. Users can remap the Shift variant at `chrome://extensions/shortcuts`. Chrome may reject/conflict with suggested manifest shortcuts; this requires manual verification.
+
+`Command+F` on macOS and `Ctrl+F` elsewhere open the extension's PDF search popover. Search extracts and caches each page's embedded text in memory with bounded concurrency, maps matches back to the lazy visible text layers, and uses Enter/Shift+Enter or arrow buttons for wrapped next/previous navigation. Scanned pages require an existing OCR text layer; the extension does not run OCR.
 
 ## 16. PDF Loading Strategy
 
@@ -219,7 +221,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
-Selectable text and annotations/links are deferred from the first stable MVP because PDF.js text/annotation layer APIs change frequently and require version-pinned browser validation. This limitation must remain visible in README/status rather than being implied as complete.
+Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. Annotation and clickable-link layers remain deferred and must stay visible in README/status rather than being implied as complete.
 
 ## 18. Current Page Detection
 
@@ -317,7 +319,8 @@ npm run check
 - Direct `file://` fetch requires the Chrome toggle and must be manually tested.
 - PDF.js worker loading under MV3 CSP must be manually tested in Chrome.
 - Image clipboard writes must be manually tested in a focused extension tab.
-- Selectable text and annotation/link layers are deferred.
+- Scanned/image-only pages are not selectable or searchable unless the PDF contains OCR text.
+- Annotation and clickable-link layers are deferred.
 - External-URL outline entries are displayed but intentionally not opened; internal page destinations are supported.
 - Encrypted PDFs and some malformed/signed/form-heavy documents may not extract correctly.
 - Very large PDFs/pages remain bounded by browser memory despite lazy rendering and pixel limits.
@@ -345,7 +348,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 43 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 46 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -353,6 +356,7 @@ npm run check
 - [x] Isolated internal shelf reordering from the full-window external-file drop overlay
 - [x] Mapped contextual Ctrl/Command+C to the IMG action while preserving native text/input copy
 - [x] Added a paper/PDF brand icon as a vector source, Chrome icon PNG sizes, and viewer/popup favicon
+- [x] Added lazy selectable text layers and full-document Ctrl/Command+F search with exact result highlights
 
 ### In progress
 
@@ -362,7 +366,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider selectable text/link layers.
+3. After stable verification, consider clickable PDF link/annotation layers.
 
 ### Blockers
 
@@ -462,10 +466,18 @@ npm run check
 
 **Decision:** Within the viewer, route plain Ctrl/Command+C through the same toolbar operation as IMG unless the user is editing a control or has selected text. Keep the existing configurable Ctrl/Command+Shift+C manifest command.
 
-**Reason:** The current PDF body is canvas-based and has no selectable text layer, so the standard copy chord is otherwise idle while reading. Context checks retain expected browser copy behavior wherever real text is available.
+**Reason:** Before selectable text layers were added, the PDF body was canvas-only, so the standard copy chord was otherwise idle while reading. Context checks retain expected browser copy behavior wherever real text is available now and in controls.
 
 ### 2026-09-09 — Use one vector source for extension identity
 
 **Decision:** Keep a font-independent SVG master showing a folded paper sheet and PDF label, and generate 16, 32, 48, and 128px PNG variants for Chrome's manifest/action icons. Use the 32px asset as the popup and viewer favicon.
 
 **Reason:** Chrome needs raster icon sizes while browser tabs need a favicon. A single vector source keeps the dark-and-mint product mark consistent and avoids platform font differences during asset generation.
+
+### 2026-09-09 — Add lazy text layers and explicit full-document search
+
+**Decision:** Render PDF.js text layers only beside the existing bounded nearby-page canvases. Intercept Ctrl/Command+F inside the viewer, build an in-memory embedded-text index with four-page concurrency, and map each result back to exact text-layer ranges using the CSS Custom Highlight API.
+
+**Reason:** Native text selection and document search remove a major gap from Chrome's built-in viewer without adding OCR, network calls, or permanent indexing storage. Keeping text layers within the existing release radius preserves the viewer's bounded DOM and canvas behavior.
+
+**Consequences:** Image-only scans remain unsearchable without embedded OCR text, and text-layer alignment/highlighting still requires manual Chrome validation against mixed-size and rotated PDFs.

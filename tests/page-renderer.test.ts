@@ -28,8 +28,11 @@ function fixture() {
     getViewport: vi.fn(({ scale }: { scale: number }) => ({
       width: 600 * scale,
       height: 800 * scale,
+      scale,
+      userUnit: 1,
     })),
     render: renderPage,
+    streamTextContent: vi.fn(() => new ReadableStream()),
     cleanup: vi.fn(),
   } as unknown as PDFPageProxy;
   const getPage = vi.fn(() => Promise.resolve(page));
@@ -43,15 +46,24 @@ function fixture() {
       style: { width: "", height: "" },
       getContext: vi.fn(() => ({})),
     },
+    textLayer: {
+      replaceChildren: vi.fn(),
+      style: { width: "", height: "" },
+    },
     label: {},
   } as unknown as PageSlot;
+  const createTextLayer = vi.fn(() => ({
+    cancel: vi.fn(),
+    render: vi.fn(() => Promise.resolve()),
+    textDivs: [],
+  }));
   return {
     document,
     getPage,
     page,
     renderPage,
     renderTasks,
-    renderer: new PageRenderer(document, new Map([[1, slot]]), 1),
+    renderer: new PageRenderer(document, new Map([[1, slot]]), 1, createTextLayer),
   };
 }
 

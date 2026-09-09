@@ -70,6 +70,7 @@ input:focus-visible {
 .topbar .brand,
 .topbar #open-file,
 .topbar .url-launcher,
+.topbar .search-launcher,
 .topbar .viewer-controls > button {
   transition:
     transform 0.22s cubic-bezier(0.2, 0.72, 0.25, 1),
@@ -80,6 +81,7 @@ input:focus-visible {
 .topbar.is-compact .brand,
 .topbar.is-compact #open-file,
 .topbar.is-compact .url-launcher,
+.topbar.is-compact .search-launcher,
 .topbar.is-compact .viewer-controls > button {
   visibility: hidden;
   opacity: 0;
@@ -224,6 +226,61 @@ button:disabled {
 .viewer-controls .icon-button {
   padding: 0 7px;
 }
+.search-launcher {
+  position: relative;
+  flex: 0 0 auto;
+}
+.search-launcher > .icon-button {
+  min-width: 36px;
+}
+.search-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 31;
+  width: min(340px, calc(100vw - 32px));
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #202329;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+.search-input-row,
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.search-input-row input {
+  min-width: 0;
+  flex: 1;
+  height: 38px;
+  padding: 0 10px;
+  color: #f5f7fa;
+  background: #111318;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.search-actions {
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+.search-actions span {
+  min-width: 0;
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-actions button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 30px;
+  padding: 0;
+}
 .page-field {
   display: flex;
   align-items: center;
@@ -288,11 +345,61 @@ button:disabled {
   max-width: none;
   background: white;
 }
+.textLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: clip;
+  color-scheme: only light;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent {
+  display: contents;
+}
+.textLayer ::selection {
+  color: transparent;
+  background: color-mix(in srgb, #3578e5, transparent 52%);
+}
+::highlight(pdf-search-hit) {
+  color: transparent;
+  background: rgba(255, 214, 74, 0.48);
+}
+::highlight(pdf-search-current) {
+  color: transparent;
+  background: rgba(255, 137, 45, 0.72);
+}
 .page-label {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  z-index: 2;
+  z-index: 3;
   padding: 3px 7px;
   border-radius: 99px;
   background: rgba(17, 19, 24, 0.7);
