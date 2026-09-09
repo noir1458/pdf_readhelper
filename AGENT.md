@@ -140,6 +140,7 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 - current page (updated only through `PageTracker` callback)
 - zoom mode/scale
 - document-session view rotation (`0`, `90`, `180`, or `270` degrees; reset when opening another document)
+- page layout (`single` continuous column or cover-first `spread`; reset when opening another document)
 - rendered page slots and render lifecycle
 - document-level load/error lifecycle
 
@@ -190,7 +191,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, search, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -221,13 +222,13 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
 ## 18. Current Page Detection
 
-`PageTracker` scores page slots from viewport intersection plus distance to viewport center. It updates only when the best candidate meaningfully beats the current page, reducing boundary flicker. Current page is always one-based in UI/domain state.
+`PageTracker` scores page slots from viewport intersection plus distance to viewport center. It updates only when the best candidate meaningfully beats the current page, reducing boundary flicker. In a two-page row, pointer or focus interaction explicitly selects the left or right sheet so page actions target the intended page rather than an arbitrary tied candidate. Current page is always one-based in UI/domain state.
 
 ## 19. PNG Export
 
@@ -282,6 +283,7 @@ Unit tests cover:
 - export-scale pixel cap calculation
 - fit-width and fit-height scale calculation
 - clockwise rotation normalization, wrapping, and intrinsic/user rotation composition
+- per-page fit-width calculation for single-column and two-page spread layouts
 - saved-document title derivation
 - OpenAI Responses text extraction and translation cache-key separation
 - PDF extraction using an in-memory generated fixture and output page-count/page-size checks
@@ -351,7 +353,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 52 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 53 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -362,6 +364,7 @@ npm run check
 - [x] Added lazy selectable text layers and full-document Ctrl/Command+F search with exact result highlights
 - [x] Added bounded clickable PDF link overlays for internal destinations and safe external URLs
 - [x] Added clockwise document view rotation shared by display, selectable layers, links, IMG, and AI capture
+- [x] Added continuous single-column and cover-first two-page spread layouts with per-sheet targeting and fit
 
 ### In progress
 
@@ -371,7 +374,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider one-page/two-page layout modes.
+3. After stable verification, consider keyboard page-turn navigation or optional reading themes.
 
 ### Blockers
 
@@ -502,3 +505,11 @@ npm run check
 **Reason:** Landscape scans and incorrectly oriented pages need a fast reading control. Using one session rotation across display and image handoff prevents the viewer, clipboard, and translation request from disagreeing about orientation.
 
 **Consequences:** Rotation resets when another PDF is opened and does not alter the source PDF. Existing cached translations may still be displayed because their textual meaning is page-based; explicitly translating again sends the currently rotated image.
+
+### 2026-09-09 — Keep two-page reading continuous and cover-first
+
+**Decision:** Add a pressed-state layout control that switches the existing continuous stack between one centered column and a two-column CSS grid. In spread mode page 1 spans both columns as a cover, later pages pair 2–3 and 4–5, pointer/focus chooses the active sheet, and fit-width divides usable width between the two sheets.
+
+**Reason:** Technical books benefit from seeing facing pages while retaining the viewer's current lazy scrolling, search, and page-tracking model. A layout-only grid reuses every existing page slot and avoids a separate paginated renderer or duplicate canvases.
+
+**Consequences:** Spread mode may require horizontal scrolling at large manual zoom levels or on narrow windows. Layout resets to single-column when another PDF opens and does not affect IMG/AI output or extracted PDF structure.

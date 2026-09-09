@@ -1,6 +1,7 @@
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 
 export type ViewRotation = 0 | 90 | 180 | 270;
+export type PageLayout = "single" | "spread";
 
 export type PdfSource =
   | { kind: "local-file"; name: string }
@@ -16,6 +17,7 @@ export type DocumentSnapshot = {
   currentPage: number;
   zoom: number;
   rotation: ViewRotation;
+  pageLayout: PageLayout;
   status: "idle" | "loading" | "ready" | "error";
   error: string | null;
 };

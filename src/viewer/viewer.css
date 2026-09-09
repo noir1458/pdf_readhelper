@@ -331,6 +331,26 @@ button:disabled {
   align-items: center;
   gap: 22px;
 }
+.page-stack[data-layout="spread"] {
+  width: max-content;
+  min-width: 100%;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-content: start;
+  align-items: start;
+  justify-content: center;
+}
+.page-stack[data-layout="spread"] .page-slot:first-child {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+.page-stack[data-layout="spread"] .page-slot {
+  width: min(720px, calc((100vw - 92px) / 2));
+}
+#toggle-page-layout[aria-pressed="true"] {
+  border-color: rgba(112, 214, 177, 0.55);
+  background: rgba(112, 214, 177, 0.12);
+}
 .page-slot {
   position: relative;
   flex: 0 0 auto;

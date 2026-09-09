@@ -97,6 +97,18 @@
             <path d="M18.5 8.5V4m0 0H14m4.5 0-3.1 3.1a7 7 0 1 0 2 7.2" />
           </svg>
         </button>
+        <button
+          id="toggle-page-layout"
+          class="icon-button"
+          type="button"
+          aria-label="Use two-page spread"
+          title="Use two-page spread"
+          aria-pressed="false"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.5 5.5h7v13h-7zM13.5 5.5h7v13h-7z" />
+          </svg>
+        </button>
         <div class="search-launcher">
           <button
             id="search-pdf"
@@ -309,7 +321,12 @@
           <div class="spinner" aria-hidden="true"></div>
           <p>Opening PDF…</p>
         </section>
-        <section id="page-stack" class="page-stack" aria-label="PDF pages"></section>
+        <section
+          id="page-stack"
+          class="page-stack"
+          data-layout="single"
+          aria-label="PDF pages"
+        ></section>
       </main>
 
       <aside id="translation-panel" class="translation-panel" aria-label="Page translation" hidden>

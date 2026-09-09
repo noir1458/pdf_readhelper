@@ -1,4 +1,4 @@
-import type { ViewRotation } from "../shared/types";
+import type { PageLayout, ViewRotation } from "../shared/types";
 
 export type Dimensions = { width: number; height: number };
 export type FitMode = "width" | "height";
@@ -10,6 +10,17 @@ export function normalizeRotation(value: number): ViewRotation {
 
 export function nextRotation(value: ViewRotation): ViewRotation {
   return normalizeRotation(value + 90);
+}
+
+export function pageWidthForLayout(
+  availableWidth: number,
+  pageLayout: PageLayout,
+  gap = 22,
+): number {
+  if (availableWidth <= 0) return 1;
+  return pageLayout === "spread"
+    ? Math.max(1, (availableWidth - Math.max(0, gap)) / 2)
+    : availableWidth;
 }
 
 export function limitedScale(

@@ -5,6 +5,7 @@ import {
   limitedScale,
   nextRotation,
   normalizeRotation,
+  pageWidthForLayout,
 } from "../src/viewer/render-math";
 
 describe("render sizing", () => {
@@ -31,5 +32,11 @@ describe("render sizing", () => {
     expect(normalizeRotation(450)).toBe(90);
     expect(normalizeRotation(-90)).toBe(270);
     expect(nextRotation(270)).toBe(0);
+  });
+
+  it("reserves half of the viewer width for each page in spread layout", () => {
+    expect(pageWidthForLayout(1222, "single")).toBe(1222);
+    expect(pageWidthForLayout(1222, "spread")).toBe(600);
+    expect(pageWidthForLayout(10, "spread", 22)).toBe(1);
   });
 });

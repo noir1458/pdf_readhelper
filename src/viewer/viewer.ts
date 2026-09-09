@@ -31,7 +31,13 @@ import { destinationPageNumber } from "./pdf-destination";
 import { namedActionPage, type PdfLinkTarget } from "./pdf-link-layer";
 import { PdfDocumentSearch, type PdfSearchMatch } from "./pdf-search";
 import { extractPdfRange } from "./range-extractor";
-import { fittedScale, nextRotation, normalizeRotation, type FitMode } from "./render-math";
+import {
+  fittedScale,
+  nextRotation,
+  normalizeRotation,
+  pageWidthForLayout,
+  type FitMode,
+} from "./render-math";
 import {
   MAX_VIEW_SCALE,
   MIN_VIEW_SCALE,
@@ -54,6 +60,7 @@ const topbarRevealZone = requireElement<HTMLElement>("#topbar-reveal-zone");
 const sidebar = requireElement<HTMLElement>("#document-sidebar");
 const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
 const rotateButton = requireElement<HTMLButtonElement>("#rotate-clockwise");
+const pageLayoutButton = requireElement<HTMLButtonElement>("#toggle-page-layout");
 const searchButton = requireElement<HTMLButtonElement>("#search-pdf");
 const searchPopover = requireElement<HTMLElement>("#search-popover");
 const searchInput = requireElement<HTMLInputElement>("#search-input");
@@ -141,6 +148,7 @@ requireElement<HTMLButtonElement>("#fit-height").addEventListener(
   () => void fitPage("height"),
 );
 rotateButton.addEventListener("click", rotateClockwise);
+pageLayoutButton.addEventListener("click", togglePageLayout);
 sidebarToggle.addEventListener("click", () => setSidebarOpen(sidebar.hasAttribute("hidden")));
 pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
@@ -302,6 +310,7 @@ async function openBytes(
 
   const pdfDocument = await session.load(bytes, source);
   updateRotationButton();
+  updatePageLayout();
   documentSearch = new PdfDocumentSearch(pdfDocument);
   const libraryId = options.savedMetadata?.id ?? documentLibraryId(pdfDocument, source);
   let savedMetadata = options.savedMetadata;
@@ -360,6 +369,8 @@ function createSlots(count: number): void {
     element.className = "page-slot";
     element.dataset.pageNumber = String(pageNumber);
     element.setAttribute("aria-label", `Page ${pageNumber}`);
+    element.addEventListener("pointerdown", () => updateCurrentPage(pageNumber));
+    element.addEventListener("focusin", () => updateCurrentPage(pageNumber));
     const canvas = document.createElement("canvas");
     const textLayer = document.createElement("div");
     textLayer.className = "textLayer";
@@ -685,10 +696,14 @@ async function fitPage(mode: FitMode): Promise<void> {
       rotation: normalizeRotation(page.rotate + session.snapshot.rotation),
     });
     const horizontalMargin = window.innerWidth <= 760 ? 24 : 56;
+    const availableWidth = pageWidthForLayout(
+      Math.max(120, scroller.clientWidth - horizontalMargin),
+      session.snapshot.pageLayout,
+    );
     const scale = fittedScale(
       viewport.width,
       viewport.height,
-      Math.max(120, scroller.clientWidth - horizontalMargin),
+      availableWidth,
       Math.max(120, scroller.clientHeight - 48),
       mode,
     );
@@ -715,6 +730,29 @@ function updateRotationButton(): void {
   const rotation = session.snapshot.rotation;
   rotateButton.title = `Rotate clockwise · current ${rotation}°`;
   rotateButton.setAttribute("aria-label", `Rotate clockwise, current rotation ${rotation} degrees`);
+}
+
+function togglePageLayout(): void {
+  if (!renderer) return;
+  const pageNumber = session.snapshot.currentPage;
+  session.setPageLayout(session.snapshot.pageLayout === "single" ? "spread" : "single");
+  updatePageLayout();
+  window.requestAnimationFrame(() => {
+    slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
+  });
+  toast.show(session.snapshot.pageLayout === "spread" ? "Two-page spread" : "Single-page layout");
+}
+
+function updatePageLayout(): void {
+  const spread = session.snapshot.pageLayout === "spread";
+  pageStack.dataset.layout = session.snapshot.pageLayout;
+  pageStack.setAttribute(
+    "aria-label",
+    spread ? "PDF pages, two-page spread" : "PDF pages, single column",
+  );
+  pageLayoutButton.setAttribute("aria-pressed", String(spread));
+  pageLayoutButton.title = spread ? "Use single-page layout" : "Use two-page spread";
+  pageLayoutButton.setAttribute("aria-label", pageLayoutButton.title);
 }
 
 function setSidebarOpen(open: boolean): void {

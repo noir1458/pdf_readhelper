@@ -13,7 +13,7 @@ import {
   PDF_WORKER_PATH,
 } from "../shared/constants";
 import { UserFacingError } from "../shared/errors";
-import type { DocumentSnapshot, PdfSource, ViewRotation } from "../shared/types";
+import type { DocumentSnapshot, PageLayout, PdfSource, ViewRotation } from "../shared/types";
 
 GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(PDF_WORKER_PATH);
 
@@ -26,6 +26,7 @@ export class DocumentSession {
   #currentPage = 1;
   #zoom = DEFAULT_VIEW_SCALE;
   #rotation: ViewRotation = 0;
+  #pageLayout: PageLayout = "single";
   #status: DocumentSnapshot["status"] = "idle";
   #error: string | null = null;
 
@@ -39,6 +40,7 @@ export class DocumentSession {
       currentPage: this.#currentPage,
       zoom: this.#zoom,
       rotation: this.#rotation,
+      pageLayout: this.#pageLayout,
       status: this.#status,
       error: this.#error,
     };
@@ -95,6 +97,10 @@ export class DocumentSession {
     this.#rotation = rotation;
   }
 
+  setPageLayout(pageLayout: PageLayout): void {
+    this.#pageLayout = pageLayout;
+  }
+
   async destroy(): Promise<void> {
     if (this.#loadingTask) {
       await this.#loadingTask.destroy().catch(() => undefined);
@@ -105,6 +111,7 @@ export class DocumentSession {
     this.#source = null;
     this.#totalPages = 0;
     this.#rotation = 0;
+    this.#pageLayout = "single";
     this.#status = "idle";
     this.#error = null;
   }
