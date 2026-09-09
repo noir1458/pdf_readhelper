@@ -9,6 +9,7 @@ import type { PageSlot, PdfSource } from "../shared/types";
 import { OPENAI_TRANSLATION_MODEL, translatePageImage } from "../translation/openai-translation";
 import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
 import { DocumentToolbar } from "../ui/document-toolbar";
+import { ReadingThemePicker } from "../ui/reading-theme-picker";
 import { TranslationPanel } from "../ui/translation-panel";
 import { Toast } from "../ui/toast";
 import { UrlPopover } from "../ui/url-popover";
@@ -126,6 +127,14 @@ const translationPanel = new TranslationPanel(requireElement<HTMLElement>("#tran
   reportError: (message) => toast.show(message, "error", 6500),
   openChanged: (open) => toolbar.setTranslationOpen(open),
 });
+
+new ReadingThemePicker(
+  requireElement<HTMLElement>("#theme-popover"),
+  requireElement<HTMLButtonElement>("#reading-theme"),
+  (theme) => {
+    scroller.dataset.readingTheme = theme;
+  },
+);
 
 new UrlPopover(
   requireElement<HTMLElement>("#url-popover"),

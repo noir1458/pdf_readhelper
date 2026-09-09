@@ -14,6 +14,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Current-page detection, page navigation, zoom, fit-width, and fit-height
 - Clockwise page rotation shared by the viewer, IMG copy, and AI translation capture
 - Continuous single-column and book-style two-page spread layouts
+- Persistent Original, Sepia, and Dark reading themes that affect display only
 - Selectable PDF text with native copy behavior
 - Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
 - Reading navigation with Space/PageDown, Shift+Space/PageUp, and Home/End
@@ -84,13 +85,14 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
+- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, reading theme, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
+- Use the palette button to choose Original, Sepia, or Dark. The preference persists locally across viewer tabs. It changes only the visible page canvases and reading surround; thumbnails, copied PNGs, AI input, downloaded PDFs, and printing retain original colors.
 - Click links inside a PDF to follow internal page destinations. Web and email links open outside the viewer in a new tab; unsupported embedded actions and PDF JavaScript are ignored.
 
 ### Download or print the original PDF
@@ -233,6 +235,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
 - [ ] Copy and explicitly retranslate a rotated page; verify the generated image follows the displayed orientation while PDF Range remains original
 - [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and clicking the right sheet updates the page counter
+- [ ] Switch among Original, Sepia, and Dark; reload the viewer to confirm persistence and verify IMG/AI/PDF/print outputs keep original colors
 - [ ] Use Space/PageDown, Shift+Space/PageUp, and Home/End over the PDF; confirm inputs, buttons, links, sidebar/translation content, and active text selections keep their native behavior
 - [ ] Select PDF text, press ⌘C/Ctrl+C, and confirm native text—not a page PNG—is copied
 - [ ] Open search with ⌘F/Ctrl+F, find a phrase across the full document, and navigate forward/backward with Enter/Shift+Enter and the arrow buttons

@@ -87,7 +87,7 @@ pdf_readhelper/
 │   ├── popup/{popup.html,popup.ts,popup.css}
 │   ├── shared/{constants,errors,filename,messages,range,source,types}.ts
 │   ├── translation/{openai-translation,translation-cache}.ts
-│   ├── ui/{document-toolbar,range-popover,toast,translation-panel,url-popover}.ts
+│   ├── ui/{document-toolbar,range-popover,reading-theme-picker,toast,translation-panel,url-popover}.ts
 │   └── viewer/
 │       ├── viewer.html
 │       ├── viewer.ts
@@ -149,6 +149,8 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 
 `TranslationCache` owns a separate IndexedDB database keyed by capture version, model, PDF fingerprint, and page. It stores translated text, token usage, model name, and update time, but never stores an API key or page image.
 
+`ReadingThemePicker` owns one viewer-wide `original`, `sepia`, or `dark` display preference in extension-page `localStorage`. It changes CSS presentation only and is intentionally separate from document state and exported content.
+
 Short operation state (copying/extracting) belongs to the toolbar controller and is reflected with disabled/busy controls. It must not mutate document state.
 
 ## 11. Message Contracts
@@ -192,10 +194,11 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, original download, original print, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, reading theme, search, original download, original print, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
+- Reading theme: palette popover with Original, Sepia, and Dark radio-style options; selection persists locally and supports arrow-key changes.
 - The third sidebar view lists locally saved PDFs using small covers, filenames, and last-read page indicators. Selecting one swaps the active document; its remove button deletes only the cached extension copy. A visible grip supports drag reordering, which is persisted in IndexedDB.
 - AI opens a closable right panel. Its key form explains session-only handling and external page-image transmission. Translation never starts from scrolling or merely opening the panel. Cached results appear automatically and can be copied as text; explicit retranslation replaces the cached result.
 - No `alert()`; use non-blocking accessible live-region toasts.
@@ -227,7 +230,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
@@ -264,7 +267,7 @@ Clipboard and extracted-PDF handoff remain explicitly user-controlled. Direct Ch
 
 ## 23. Options / Settings
 
-MVP uses named constants for export scale, pixel cap, render margin, and translation model. A persistent settings/options page is deferred until real usage identifies useful controls. The API key is intentionally session-memory-only, so no `storage` permission is needed.
+MVP uses named constants for export scale, pixel cap, render margin, and translation model. The lightweight reading-theme preference uses extension-page `localStorage`; a separate settings/options page is deferred until real usage identifies other useful controls. The API key remains intentionally session-memory-only, so no `storage` permission is needed.
 
 ## 24. Accessibility
 
@@ -284,6 +287,7 @@ Unit tests cover:
 - `1`, `1-1`, reversed, zero, malformed, and out-of-bounds ranges
 - filename generation (`7.pdf`, `2-11.pdf`)
 - safe original filenames for local files and decoded URLs
+- reading-theme normalization and storage fallback
 - URL/source classification and query normalization
 - current-page scoring/hysteresis helper
 - export-scale pixel cap calculation
@@ -361,7 +365,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 62 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 65 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -375,6 +379,7 @@ npm run check
 - [x] Added continuous single-column and cover-first two-page spread layouts with per-sheet targeting and fit
 - [x] Added contextual Space/PageUp/PageDown/Home/End reading navigation with native-control and text-selection preservation
 - [x] Added unchanged original-PDF download/print controls and Ctrl/Command+S/P routing without full-document rerendering
+- [x] Added persistent Original/Sepia/Dark display themes isolated from thumbnails and exported content
 
 ### In progress
 
@@ -384,7 +389,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider optional reading themes or lightweight bookmarks/notes.
+3. After stable verification, consider lightweight per-page bookmarks/notes.
 
 ### Blockers
 
@@ -539,3 +544,11 @@ npm run check
 **Reason:** Saving the viewer page would produce HTML, while rendering every page for printing would be especially expensive for the 300-page books this extension targets. Reusing the retained original bytes preserves PDF text, vectors, forms, page sizes, and native print pagination.
 
 **Consequences:** The native-viewer fallback needs one extra click on Chrome's print button, and both print paths require manual desktop Chrome verification. Blob URLs are revoked immediately after a completed dialog or after a bounded five-minute lifetime for the fallback tab.
+
+### 2026-09-09 — Keep reading themes display-only and viewer-wide
+
+**Decision:** Add Original, Sepia, and Dark choices through a palette popover and persist the choice in extension-page `localStorage`. Apply the selected filter only to main-viewer page canvases and their surround, not to thumbnail canvases, independent IMG/AI renders, PDF extraction, original download, or printing.
+
+**Reason:** A dimmer page improves long reading sessions, but changing copied pages or AI inputs would make display preference silently alter downstream content and translation behavior. A single viewer-wide preference is more predictable than resetting the theme for every book.
+
+**Consequences:** Dark mode uses a CSS inversion/hue-preservation filter that works best for text-heavy documents; photographs and unusually colored diagrams can look imperfect, so Original remains one click away. Theme persistence requires no Chrome `storage` permission and must still be visually checked in the unpacked extension.
