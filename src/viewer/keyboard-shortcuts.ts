@@ -8,6 +8,8 @@ type ReadingNavigationEvent = CopyShortcutEvent;
 export type ReadingNavigationAction =
   "viewport-forward" | "viewport-backward" | "document-start" | "document-end";
 
+export type OriginalDocumentShortcutAction = "download-original" | "print-original";
+
 export function isPageCopyShortcut(event: CopyShortcutEvent): boolean {
   return (
     !event.defaultPrevented &&
@@ -52,4 +54,21 @@ export function readingScrollOffset(
   if (action !== "viewport-forward" && action !== "viewport-backward") return null;
   const distance = Math.max(1, Math.round(viewportHeight * 0.88));
   return action === "viewport-forward" ? distance : -distance;
+}
+
+export function originalDocumentShortcutAction(
+  event: CopyShortcutEvent,
+): OriginalDocumentShortcutAction | null {
+  if (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.shiftKey ||
+    !(event.ctrlKey || event.metaKey)
+  ) {
+    return null;
+  }
+  if (event.key.toLowerCase() === "s") return "download-original";
+  if (event.key.toLowerCase() === "p") return "print-original";
+  return null;
 }

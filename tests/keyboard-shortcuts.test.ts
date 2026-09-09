@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isPageCopyShortcut,
+  originalDocumentShortcutAction,
   readingNavigationAction,
   readingScrollOffset,
 } from "../src/viewer/keyboard-shortcuts";
@@ -54,5 +55,28 @@ describe("reading navigation shortcut", () => {
     expect(readingScrollOffset("viewport-forward", 1000)).toBe(880);
     expect(readingScrollOffset("viewport-backward", 1000)).toBe(-880);
     expect(readingScrollOffset("document-start", 1000)).toBeNull();
+  });
+});
+
+describe("original document shortcuts", () => {
+  it("maps Ctrl/Command+S and Ctrl/Command+P", () => {
+    expect(originalDocumentShortcutAction(event({ key: "s", ctrlKey: true }))).toBe(
+      "download-original",
+    );
+    expect(originalDocumentShortcutAction(event({ key: "P", metaKey: true }))).toBe(
+      "print-original",
+    );
+  });
+
+  it("ignores modified, repeated, and already handled events", () => {
+    expect(
+      originalDocumentShortcutAction(event({ key: "s", ctrlKey: true, shiftKey: true })),
+    ).toBeNull();
+    expect(
+      originalDocumentShortcutAction(event({ key: "p", metaKey: true, repeat: true })),
+    ).toBeNull();
+    expect(
+      originalDocumentShortcutAction(event({ key: "p", ctrlKey: true, defaultPrevented: true })),
+    ).toBeNull();
   });
 });

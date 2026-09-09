@@ -99,6 +99,7 @@ pdf_readhelper/
 │       ├── page-renderer.ts
 │       ├── page-tracker.ts
 │       ├── range-extractor.ts
+│       ├── original-document.ts
 │       └── render-math.ts
 ├── tests/
 └── dist/                 # generated; do not edit
@@ -186,12 +187,12 @@ Errors are not swallowed. Console output may contain technical error objects dur
 - Export uses an independent scale (default `2.0`) and a maximum pixel count to prevent oversized-page memory spikes.
 - Export margin detection uses a separate low-resolution render capped at 640 pixels on its longest side.
 - Export canvases are zeroed after blob creation.
-- Original bytes are retained once for range extraction; avoid additional long-lived copies.
+- Original bytes are retained once for range extraction, unchanged download, and native PDF print handoff; avoid additional long-lived copies.
 - Saved-document list reads metadata only; full PDF bytes are loaded only when a document is selected.
 
 ## 14. UX Specification
 
-The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, original download, original print, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -211,6 +212,8 @@ Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke
 
 When focus is in the PDF reading surface, Space/PageDown advance by 88% of the viewport, Shift+Space/PageUp move backward by the same amount, and Home/End navigate to the first/last page. These document-level shortcuts ignore repeated, modified, and already-handled events. Native key behavior remains available in interactive controls, links, the sidebar, the translation panel, and while real text is selected.
 
+Within an open viewer document, unmodified Ctrl/Command+S downloads the unchanged original PDF rather than the extension viewer HTML, and Ctrl/Command+P invokes the original-PDF print handoff. Repeated, shifted, alt-modified, and already-handled events retain browser behavior.
+
 ## 16. PDF Loading Strategy
 
 Supported inputs:
@@ -224,7 +227,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
@@ -280,6 +283,7 @@ Unit tests cover:
 - `2-11` produces indices 1–10 and count 10
 - `1`, `1-1`, reversed, zero, malformed, and out-of-bounds ranges
 - filename generation (`7.pdf`, `2-11.pdf`)
+- safe original filenames for local files and decoded URLs
 - URL/source classification and query normalization
 - current-page scoring/hysteresis helper
 - export-scale pixel cap calculation
@@ -325,6 +329,7 @@ npm run check
 - No toolbar injection into Chrome's internal PDF viewer.
 - Public/authenticated PDF URLs may fail due to CORS/auth/session restrictions.
 - Direct `file://` fetch requires the Chrome toggle and must be manually tested.
+- Desktop Chrome has no general extension API for direct PDF printer submission. Original printing first uses an invisible PDF frame, then falls back to a native PDF viewer tab when framed printing is unavailable.
 - PDF.js worker loading under MV3 CSP must be manually tested in Chrome.
 - Image clipboard writes must be manually tested in a focused extension tab.
 - Scanned/image-only pages are not selectable or searchable unless the PDF contains OCR text.
@@ -356,7 +361,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 57 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 62 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -369,6 +374,7 @@ npm run check
 - [x] Added clockwise document view rotation shared by display, selectable layers, links, IMG, and AI capture
 - [x] Added continuous single-column and cover-first two-page spread layouts with per-sheet targeting and fit
 - [x] Added contextual Space/PageUp/PageDown/Home/End reading navigation with native-control and text-selection preservation
+- [x] Added unchanged original-PDF download/print controls and Ctrl/Command+S/P routing without full-document rerendering
 
 ### In progress
 
@@ -378,7 +384,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider original-PDF download/print actions or optional reading themes.
+3. After stable verification, consider optional reading themes or lightweight bookmarks/notes.
 
 ### Blockers
 
@@ -525,3 +531,11 @@ npm run check
 **Reason:** Long documents benefit from predictable keyboard reading without requiring precise scrollbar or page-field interaction. A small viewport overlap preserves the reader's visual place, while contextual exclusions prevent the shortcuts from breaking buttons, inputs, links, or selectable text.
 
 **Consequences:** Holding a navigation key does not auto-repeat, and Home/End open the first/last page at its start rather than scrolling to an arbitrary pixel at the extreme boundary. Chrome runtime behavior still needs the normal unpacked-extension manual pass.
+
+### 2026-09-09 — Hand original bytes to Chrome for download and printing
+
+**Decision:** Add toolbar actions plus Ctrl/Command+S and Ctrl/Command+P for the unchanged source PDF. Download uses the existing downloads API. Printing creates a short-lived Blob URL and first asks a hidden PDF frame to print; if Chrome denies or cannot load that frame, open the same Blob in the native PDF viewer at the current page. Do not rasterize the full document.
+
+**Reason:** Saving the viewer page would produce HTML, while rendering every page for printing would be especially expensive for the 300-page books this extension targets. Reusing the retained original bytes preserves PDF text, vectors, forms, page sizes, and native print pagination.
+
+**Consequences:** The native-viewer fallback needs one extra click on Chrome's print button, and both print paths require manual desktop Chrome verification. Blob URLs are revoked immediately after a completed dialog or after a bounded five-minute lifetime for the fallback tab.

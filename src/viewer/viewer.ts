@@ -1,7 +1,7 @@
 import { writePngToClipboard } from "../clipboard/clipboard";
 import { downloadBlob } from "../shared/download";
 import { errorMessage, UserFacingError } from "../shared/errors";
-import { pageImageFilename, rangeFilename } from "../shared/filename";
+import { originalPdfFilename, pageImageFilename, rangeFilename } from "../shared/filename";
 import { isExtensionMessage } from "../shared/messages";
 import { classifyPdfUrl, sourceUrlFromLocation } from "../shared/source";
 import type { PageRange } from "../shared/range";
@@ -17,9 +17,11 @@ import { DocumentSidebar } from "./document-sidebar";
 import { hasFileDragType } from "./drag-data";
 import {
   isPageCopyShortcut,
+  originalDocumentShortcutAction,
   readingNavigationAction,
   readingScrollOffset,
 } from "./keyboard-shortcuts";
+import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
   DocumentLibrary,
   documentLibraryId,
@@ -71,6 +73,8 @@ const searchInput = requireElement<HTMLInputElement>("#search-input");
 const searchStatus = requireElement<HTMLElement>("#search-status");
 const searchPrevious = requireElement<HTMLButtonElement>("#search-previous");
 const searchNext = requireElement<HTMLButtonElement>("#search-next");
+const downloadOriginalButton = requireElement<HTMLButtonElement>("#download-original");
+const printOriginalButton = requireElement<HTMLButtonElement>("#print-original");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
 const tracker = new PageTracker(scroller, updateCurrentPage);
 const documentLibrary = new DocumentLibrary();
@@ -162,6 +166,8 @@ searchButton.addEventListener("click", toggleSearch);
 requireElement<HTMLButtonElement>("#close-search").addEventListener("click", closeSearch);
 searchPrevious.addEventListener("click", () => void moveSearchResult(-1));
 searchNext.addEventListener("click", () => void moveSearchResult(1));
+downloadOriginalButton.addEventListener("click", () => void downloadOriginal());
+printOriginalButton.addEventListener("click", () => void printOriginal());
 searchInput.addEventListener("input", scheduleSearch);
 searchInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
@@ -172,6 +178,7 @@ searchInput.addEventListener("keydown", (event) => {
 document.addEventListener("keydown", handlePageCopyShortcut);
 document.addEventListener("keydown", handlePdfSearchShortcut);
 document.addEventListener("keydown", handleReadingNavigationShortcut);
+document.addEventListener("keydown", handleOriginalDocumentShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
 topbar.addEventListener("focusin", (event) => {
@@ -251,6 +258,14 @@ function handleReadingNavigationShortcut(event: KeyboardEvent): void {
     return;
   }
   navigateToPage(action === "document-start" ? 1 : session.snapshot.totalPages);
+}
+
+function handleOriginalDocumentShortcut(event: KeyboardEvent): void {
+  const action = originalDocumentShortcutAction(event);
+  if (!session.snapshot.document || !action) return;
+  event.preventDefault();
+  if (action === "download-original") void downloadOriginal();
+  else void printOriginal();
 }
 
 function shouldKeepNativeCopy(target: EventTarget | null): boolean {
@@ -338,6 +353,8 @@ async function openBytes(
   documentSidebar.destroy();
   setSidebarOpen(false);
   sidebarToggle.disabled = true;
+  downloadOriginalButton.disabled = true;
+  printOriginalButton.disabled = true;
   slots.clear();
   pageStack.replaceChildren();
 
@@ -375,6 +392,8 @@ async function openBytes(
   scheduleTopbarCollapse();
   sidebarToggle.disabled = false;
   searchButton.disabled = false;
+  downloadOriginalButton.disabled = false;
+  printOriginalButton.disabled = false;
   documentSidebar.showPanel(options.keepDocumentsPanel ? "documents" : "thumbnails");
   void documentSidebar.setDocument(pdfDocument);
   setSidebarOpen(true);
@@ -903,6 +922,44 @@ async function extractRange(range: PageRange): Promise<void> {
     toast.show(`Saved ${filename}`, "success");
   } catch (error) {
     toast.show(errorMessage(error), "error", 6000);
+  }
+}
+
+async function downloadOriginal(): Promise<void> {
+  if (downloadOriginalButton.disabled) return;
+  downloadOriginalButton.disabled = true;
+  downloadOriginalButton.setAttribute("aria-busy", "true");
+  try {
+    const source = session.snapshot.source;
+    if (!source) throw new UserFacingError("Open a PDF first.");
+    const filename = originalPdfFilename(source);
+    await downloadBlob(originalPdfBlob(session.requireBytes()), filename);
+    toast.show(`Saved ${filename}`, "success");
+  } catch (error) {
+    toast.show(`Could not download original PDF: ${errorMessage(error)}`, "error", 6000);
+  } finally {
+    downloadOriginalButton.disabled = !session.snapshot.document;
+    downloadOriginalButton.removeAttribute("aria-busy");
+  }
+}
+
+async function printOriginal(): Promise<void> {
+  if (printOriginalButton.disabled) return;
+  printOriginalButton.disabled = true;
+  printOriginalButton.setAttribute("aria-busy", "true");
+  try {
+    const result = await printOriginalPdf(
+      originalPdfBlob(session.requireBytes()),
+      session.snapshot.currentPage,
+    );
+    if (result === "native-viewer") {
+      toast.show("Opened the original PDF in a new tab. Use the browser print button.", "success");
+    }
+  } catch (error) {
+    toast.show(`Could not print original PDF: ${errorMessage(error)}`, "error", 6000);
+  } finally {
+    printOriginalButton.disabled = !session.snapshot.document;
+    printOriginalButton.removeAttribute("aria-busy");
   }
 }
 

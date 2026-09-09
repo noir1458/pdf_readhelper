@@ -18,6 +18,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
 - Reading navigation with Space/PageDown, Shift+Space/PageUp, and Home/End
 - Clickable PDF links with internal-page navigation and safe external-tab opening
+- Original PDF download and print handoff without rerendering every page
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
@@ -83,7 +84,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
+- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
@@ -91,6 +92,13 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
 - Click links inside a PDF to follow internal page destinations. Web and email links open outside the viewer in a new tab; unsupported embedded actions and PDF JavaScript are ignored.
+
+### Download or print the original PDF
+
+- Use the down-arrow button or ⌘S/Ctrl+S to save the unchanged source PDF with a safe filename.
+- Use the printer button or ⌘P/Ctrl+P to print the unchanged source PDF. The extension first asks Chrome's PDF frame to open its print dialog. If Chrome blocks framed PDF printing, it opens the original PDF in the native viewer so its print button can be used.
+
+Both actions reuse the already loaded bytes. They do not render hundreds of page canvases, apply the viewer's rotation, or alter the source file.
 
 ### Saved documents and reading position
 
@@ -136,6 +144,8 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 - **⌘F** on macOS / **Ctrl+F** elsewhere: search all text-bearing pages in the current PDF. Enter moves forward and Shift+Enter moves backward.
 - **⌘C** on macOS / **Ctrl+C** elsewhere while viewing the PDF: copy the current page as an image, matching the IMG button. Normal copy is preserved in inputs and when text is selected.
 - **⌘⇧C** on macOS / **Ctrl+Shift+C** elsewhere: copy current page
+- **⌘S** on macOS / **Ctrl+S** elsewhere: download the unchanged original PDF.
+- **⌘P** on macOS / **Ctrl+P** elsewhere: print the unchanged original PDF, with native-viewer fallback.
 - **Space** or **Page Down**: move forward by most of one viewport, retaining a small reading overlap.
 - **Shift+Space** or **Page Up**: move backward by most of one viewport.
 - **Home** / **End**: move to the first / last page.
@@ -227,6 +237,8 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Select PDF text, press ⌘C/Ctrl+C, and confirm native text—not a page PNG—is copied
 - [ ] Open search with ⌘F/Ctrl+F, find a phrase across the full document, and navigate forward/backward with Enter/Shift+Enter and the arrow buttons
 - [ ] Click an internal page link and an external web link; confirm the former navigates in the viewer and the latter opens a new tab
+- [ ] Download the original PDF with the toolbar and ⌘S/Ctrl+S; confirm its bytes/pages are unchanged and its filename is safe
+- [ ] Print with the toolbar and ⌘P/Ctrl+P; confirm either the PDF print dialog opens or the native PDF viewer opens at the current page as a fallback
 - [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls; confirm the expanded toolbar pushes sidebar content below it
 - [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears
