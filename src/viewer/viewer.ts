@@ -24,6 +24,13 @@ import {
 } from "./keyboard-shortcuts";
 import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
+  extractBookmarkTitle,
+  pageBookmarkKey,
+  PageBookmarkStore,
+  sortPageBookmarks,
+  type PageBookmark,
+} from "./page-bookmarks";
+import {
   DocumentLibrary,
   documentLibraryId,
   documentLibraryTitle,
@@ -76,10 +83,12 @@ const searchPrevious = requireElement<HTMLButtonElement>("#search-previous");
 const searchNext = requireElement<HTMLButtonElement>("#search-next");
 const downloadOriginalButton = requireElement<HTMLButtonElement>("#download-original");
 const printOriginalButton = requireElement<HTMLButtonElement>("#print-original");
+const bookmarkButton = requireElement<HTMLButtonElement>("#toggle-bookmark");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
 const tracker = new PageTracker(scroller, updateCurrentPage);
 const documentLibrary = new DocumentLibrary();
 const translationCache = new TranslationCache();
+const bookmarkStore = new PageBookmarkStore();
 const slots = new Map<number, PageSlot>();
 let renderer: PageRenderer | null = null;
 let renderObserver: IntersectionObserver | null = null;
@@ -93,6 +102,8 @@ let documentSearch: PdfDocumentSearch | null = null;
 let searchController: AbortController | null = null;
 let searchMatches: PdfSearchMatch[] = [];
 let activeSearchMatch = -1;
+let currentBookmarks = new Map<number, PageBookmark>();
+let bookmarkBusy = false;
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -100,18 +111,22 @@ const documentSidebar = new DocumentSidebar(
     thumbnailsTab: requireElement<HTMLButtonElement>("#thumbnails-tab"),
     outlineTab: requireElement<HTMLButtonElement>("#outline-tab"),
     documentsTab: requireElement<HTMLButtonElement>("#documents-tab"),
+    bookmarksTab: requireElement<HTMLButtonElement>("#bookmarks-tab"),
     thumbnailsPanel: requireElement<HTMLElement>("#thumbnails-panel"),
     outlinePanel: requireElement<HTMLElement>("#outline-panel"),
     documentsPanel: requireElement<HTMLElement>("#documents-panel"),
+    bookmarksPanel: requireElement<HTMLElement>("#bookmarks-panel"),
     thumbnailsList: requireElement<HTMLElement>("#thumbnails-list"),
     outlineList: requireElement<HTMLElement>("#outline-list"),
     documentsList: requireElement<HTMLElement>("#documents-list"),
+    bookmarksList: requireElement<HTMLElement>("#bookmarks-list"),
   },
   {
     navigate: (pageNumber) => navigateToPage(pageNumber),
     openDocument: openSavedDocument,
     removeDocument: removeSavedDocument,
     reorderDocuments: reorderSavedDocuments,
+    removeBookmark,
     reportError: (message) => toast.show(message, "error"),
   },
 );
@@ -177,6 +192,7 @@ searchPrevious.addEventListener("click", () => void moveSearchResult(-1));
 searchNext.addEventListener("click", () => void moveSearchResult(1));
 downloadOriginalButton.addEventListener("click", () => void downloadOriginal());
 printOriginalButton.addEventListener("click", () => void printOriginal());
+bookmarkButton.addEventListener("click", () => void toggleBookmark());
 searchInput.addEventListener("input", scheduleSearch);
 searchInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
@@ -352,6 +368,7 @@ async function openBytes(
   translationRequestController?.abort();
   translationRequestController = null;
   resetSearch();
+  resetBookmarks();
   flushReadingPosition();
   activeDocumentId = null;
   const previousRenderer = renderer;
@@ -406,6 +423,7 @@ async function openBytes(
   documentSidebar.showPanel(options.keepDocumentsPanel ? "documents" : "thumbnails");
   void documentSidebar.setDocument(pdfDocument);
   setSidebarOpen(true);
+  await loadBookmarks(libraryId);
   emptyState.hidden = true;
   document.title =
     source.kind === "local-file" ? `${source.name} — PDF Read Helper` : "PDF Read Helper";
@@ -488,6 +506,7 @@ function updateCurrentPage(pageNumber: number): void {
   pageInput.value = String(pageNumber);
   toolbar.setCurrentPage(pageNumber);
   documentSidebar.setCurrentPage(pageNumber);
+  updateBookmarkButton();
   scheduleReadingPositionSave(pageNumber);
   renderer?.releaseDistant(pageNumber);
   if (translationPanel.isOpen) void loadCachedTranslation(pageNumber);
@@ -643,6 +662,113 @@ async function showActiveSearchMatch(): Promise<void> {
   }
 }
 
+function resetBookmarks(): void {
+  currentBookmarks = new Map();
+  bookmarkBusy = false;
+  bookmarkButton.disabled = true;
+  bookmarkButton.setAttribute("aria-pressed", "false");
+  bookmarkButton.setAttribute("aria-label", "Bookmark current page");
+  bookmarkButton.title = "Bookmark current page";
+  documentSidebar.setBookmarks([]);
+}
+
+async function loadBookmarks(documentId: string): Promise<void> {
+  bookmarkBusy = true;
+  updateBookmarkButton();
+  try {
+    const bookmarks = await bookmarkStore.list(documentId);
+    if (activeDocumentId !== documentId) return;
+    currentBookmarks = new Map(bookmarks.map((bookmark) => [bookmark.pageNumber, bookmark]));
+    documentSidebar.setBookmarks(bookmarks);
+  } catch {
+    if (activeDocumentId === documentId) {
+      currentBookmarks = new Map();
+      documentSidebar.setBookmarks([]);
+      toast.show("The PDF is open, but its bookmarks could not be loaded.", "error", 5600);
+    }
+  } finally {
+    if (activeDocumentId === documentId) {
+      bookmarkBusy = false;
+      updateBookmarkButton();
+    }
+  }
+}
+
+async function toggleBookmark(): Promise<void> {
+  const documentId = activeDocumentId;
+  const pdfDocument = session.snapshot.document;
+  const pageNumber = session.snapshot.currentPage;
+  if (!documentId || !pdfDocument || bookmarkBusy) return;
+
+  bookmarkBusy = true;
+  updateBookmarkButton();
+  try {
+    if (currentBookmarks.has(pageNumber)) {
+      await bookmarkStore.remove(documentId, pageNumber);
+      if (activeDocumentId === documentId) {
+        currentBookmarks.delete(pageNumber);
+        renderBookmarks();
+        toast.show(`Removed bookmark for page ${pageNumber}`, "success");
+      }
+      return;
+    }
+
+    let title = `Page ${pageNumber}`;
+    try {
+      title = await extractBookmarkTitle(pdfDocument, pageNumber);
+    } catch {
+      // Textless or malformed page content still gets a useful page-number bookmark.
+    }
+    const bookmark: PageBookmark = {
+      id: pageBookmarkKey(documentId, pageNumber),
+      documentId,
+      pageNumber,
+      title,
+      createdAt: Date.now(),
+    };
+    await bookmarkStore.put(bookmark);
+    if (activeDocumentId === documentId) {
+      currentBookmarks.set(pageNumber, bookmark);
+      renderBookmarks();
+      toast.show(`Bookmarked page ${pageNumber}`, "success");
+    }
+  } catch (error) {
+    if (activeDocumentId === documentId) {
+      toast.show(`Could not update bookmark: ${errorMessage(error)}`, "error", 5600);
+    }
+  } finally {
+    if (activeDocumentId === documentId) {
+      bookmarkBusy = false;
+      updateBookmarkButton();
+    }
+  }
+}
+
+async function removeBookmark(pageNumber: number): Promise<void> {
+  const documentId = activeDocumentId;
+  if (!documentId) throw new UserFacingError("Open the bookmarked PDF first.");
+  await bookmarkStore.remove(documentId, pageNumber);
+  if (activeDocumentId !== documentId) return;
+  currentBookmarks.delete(pageNumber);
+  renderBookmarks();
+  updateBookmarkButton();
+  toast.show(`Removed bookmark for page ${pageNumber}`, "success");
+}
+
+function renderBookmarks(): void {
+  documentSidebar.setBookmarks(sortPageBookmarks([...currentBookmarks.values()]));
+}
+
+function updateBookmarkButton(): void {
+  const canBookmark = Boolean(session.snapshot.document && activeDocumentId);
+  const bookmarked = canBookmark && currentBookmarks.has(session.snapshot.currentPage);
+  bookmarkButton.disabled = !canBookmark || bookmarkBusy;
+  bookmarkButton.setAttribute("aria-pressed", String(bookmarked));
+  const label = bookmarked ? "Remove current page bookmark" : "Bookmark current page";
+  bookmarkButton.setAttribute("aria-label", label);
+  bookmarkButton.title = label;
+}
+
 async function openSavedDocument(id: string): Promise<void> {
   const savedDocument = await documentLibrary.get(id);
   if (!savedDocument) throw new UserFacingError("That saved PDF is no longer available.");
@@ -657,8 +783,17 @@ async function openSavedDocument(id: string): Promise<void> {
 }
 
 async function removeSavedDocument(id: string): Promise<void> {
-  await Promise.all([documentLibrary.remove(id), translationCache.removeDocument(id)]);
-  if (activeDocumentId === id) activeDocumentId = null;
+  await Promise.all([
+    documentLibrary.remove(id),
+    translationCache.removeDocument(id),
+    bookmarkStore.removeDocument(id),
+  ]);
+  if (activeDocumentId === id) {
+    activeDocumentId = null;
+    currentBookmarks = new Map();
+    documentSidebar.setBookmarks([]);
+    updateBookmarkButton();
+  }
   if (!activeDocumentId) translationPanel.showPage(session.snapshot.currentPage, null);
   await refreshDocumentLibrary();
   toast.show("Removed from saved documents", "success");

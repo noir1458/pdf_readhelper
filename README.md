@@ -25,6 +25,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
 - Local saved-document shelf with cover thumbnails, filenames, last-read pages, and persistent drag reordering
 - Per-document page restoration across viewer and browser restarts
+- Persistent per-PDF page bookmarks with local automatic titles and sidebar navigation
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
 - Local pixel-based margin detection, safe content cropping, and 70% output resampling
 - PNG clipboard write with automatic download fallback
@@ -85,7 +86,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, reading theme, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
+- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, reading theme, bookmark, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
@@ -109,6 +110,13 @@ Both actions reuse the already loaded bytes. They do not render hundreds of page
 - Select an entry to switch documents. The viewer restores that document to its last-read page.
 - Use the entry's `×` button to remove the extension's saved copy. This does not delete the original file.
 - PDFs and page positions are stored locally in the extension's IndexedDB and are never uploaded.
+
+### Page bookmarks
+
+- Click the ribbon button to add or remove a bookmark for the current page. Its pressed state shows whether the page is bookmarked.
+- Open the fourth sidebar tab to see the current PDF's bookmarks, sorted by page number. Select one to navigate or use its `×` button to remove it.
+- A short title is taken locally from the page's first meaningful embedded text. Textless/scanned pages use `Page N`; no AI or network request is involved.
+- Bookmarks persist by PDF fingerprint. Removing a PDF from the saved-document shelf also removes its local bookmarks.
 
 ### Copy current page
 
@@ -228,6 +236,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Open a 100+ page document and inspect that distant canvases are released
 - [ ] Switch between thumbnails and table of contents; navigate with both
 - [ ] Switch between two saved PDFs, drag them into a new order, and verify the cover/title list, persistent order, and restored page
+- [ ] Bookmark text and scanned pages, switch PDFs/reload Chrome, and verify automatic titles, navigation, pressed state, persistence, and removal
 - [ ] Reload Chrome and verify that saved documents and last-read pages remain available
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click

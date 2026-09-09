@@ -175,6 +175,19 @@
             </div>
           </div>
         </div>
+        <button
+          id="toggle-bookmark"
+          class="icon-button"
+          type="button"
+          aria-label="Bookmark current page"
+          title="Bookmark current page"
+          aria-pressed="false"
+          disabled
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6.5 3.5h11v17L12 17l-5.5 3.5z" />
+          </svg>
+        </button>
         <div class="search-launcher">
           <button
             id="search-pdf"
@@ -370,6 +383,20 @@
               <path d="M7 4h12v15H7zM4 7v13h11" />
             </svg>
           </button>
+          <button
+            id="bookmarks-tab"
+            class="sidebar-tab icon-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="bookmarks-panel"
+            aria-label="Page bookmarks"
+            title="Page bookmarks"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3.5h10v17L12 17l-5 3.5z" />
+            </svg>
+          </button>
         </div>
         <section
           id="thumbnails-panel"
@@ -396,6 +423,15 @@
           hidden
         >
           <div id="documents-list" class="documents-list"></div>
+        </section>
+        <section
+          id="bookmarks-panel"
+          class="sidebar-panel"
+          role="tabpanel"
+          aria-labelledby="bookmarks-tab"
+          hidden
+        >
+          <div id="bookmarks-list" class="bookmarks-list"></div>
         </section>
       </aside>
 
