@@ -14,6 +14,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Current-page detection, page navigation, zoom, fit-width, and fit-height
 - Selectable PDF text with native copy behavior
 - Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
+- Clickable PDF links with internal-page navigation and safe external-tab opening
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
@@ -84,6 +85,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
+- Click links inside a PDF to follow internal page destinations. Web and email links open outside the viewer in a new tab; unsupported embedded actions and PDF JavaScript are ignored.
 
 ### Saved documents and reading position
 
@@ -188,7 +190,7 @@ There are no always-on content scripts and no passive browsing collection.
 - Public PDF fetch can fail due to CORS, authentication, session, or anti-hotlink rules.
 - `file://` access requires the manual Chrome setting above.
 - Scanned/image-only pages have no selectable or searchable text unless the PDF itself contains an OCR text layer.
-- Annotation and clickable-link layers are not included yet.
+- Form fields, annotation editing/popups, attachments, and embedded PDF JavaScript are not enabled. The overlay handles links only.
 - Encrypted PDFs are not supported. Signed, malformed, form-heavy, or unusual annotated PDFs may not extract perfectly.
 - PDF bookmarks/outlines and signatures are not guaranteed to survive range extraction.
 - Browser memory still limits extremely large documents/pages despite lazy rendering and pixel caps.
@@ -212,6 +214,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Zoom, fit width, and fit height
 - [ ] Select PDF text, press ⌘C/Ctrl+C, and confirm native text—not a page PNG—is copied
 - [ ] Open search with ⌘F/Ctrl+F, find a phrase across the full document, and navigate forward/backward with Enter/Shift+Enter and the arrow buttons
+- [ ] Click an internal page link and an external web link; confirm the former navigates in the viewer and the latter opens a new tab
 - [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls; confirm the expanded toolbar pushes sidebar content below it
 - [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears

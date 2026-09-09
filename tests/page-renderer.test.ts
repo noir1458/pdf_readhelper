@@ -33,6 +33,7 @@ function fixture() {
     })),
     render: renderPage,
     streamTextContent: vi.fn(() => new ReadableStream()),
+    getAnnotations: vi.fn(() => Promise.resolve([])),
     cleanup: vi.fn(),
   } as unknown as PDFPageProxy;
   const getPage = vi.fn(() => Promise.resolve(page));
@@ -47,6 +48,10 @@ function fixture() {
       getContext: vi.fn(() => ({})),
     },
     textLayer: {
+      replaceChildren: vi.fn(),
+      style: { width: "", height: "" },
+    },
+    linkLayer: {
       replaceChildren: vi.fn(),
       style: { width: "", height: "" },
     },

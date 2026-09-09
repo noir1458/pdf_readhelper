@@ -1,6 +1,7 @@
 import { TextLayer, type PDFDocumentProxy, type PDFPageProxy, type RenderTask } from "pdfjs-dist";
 import { MAX_DISPLAY_PIXELS, RELEASE_RADIUS } from "../shared/constants";
 import type { PageSlot } from "../shared/types";
+import { pdfLinkRegions, renderPdfLinkLayer, type PdfLinkTarget } from "./pdf-link-layer";
 import type { PdfSearchMatch, SearchTextRange } from "./pdf-search";
 import { canvasDimensions, limitedScale } from "./render-math";
 
@@ -18,11 +19,13 @@ type RenderedPage = {
 
 type TextLayerHandle = Pick<TextLayer, "cancel" | "render" | "textDivs">;
 type TextLayerFactory = (options: ConstructorParameters<typeof TextLayer>[0]) => TextLayerHandle;
+type LinkActivator = (target: PdfLinkTarget) => void;
 
 export class PageRenderer {
   readonly #document: PDFDocumentProxy;
   readonly #slots: Map<number, PageSlot>;
   readonly #createTextLayer: TextLayerFactory;
+  readonly #activateLink: LinkActivator;
   readonly #rendering = new Map<number, RenderJob>();
   readonly #renderedPages = new Map<number, RenderedPage>();
   #searchMatches: PdfSearchMatch[] = [];
@@ -36,11 +39,13 @@ export class PageRenderer {
     slots: Map<number, PageSlot>,
     zoom: number,
     createTextLayer: TextLayerFactory = (options) => new TextLayer(options),
+    activateLink: LinkActivator = () => undefined,
   ) {
     this.#document = document;
     this.#slots = slots;
     this.#zoom = zoom;
     this.#createTextLayer = createTextLayer;
+    this.#activateLink = activateLink;
   }
 
   setZoom(zoom: number): void {
@@ -128,6 +133,17 @@ export class PageRenderer {
       await textLayer.render();
       if (!this.#isCurrent(job)) return;
 
+      slot.linkLayer.style.width = `${cssViewport.width}px`;
+      slot.linkLayer.style.height = `${cssViewport.height}px`;
+      const annotations = await page.getAnnotations({ intent: "display" });
+      if (!this.#isCurrent(job)) return;
+      renderPdfLinkLayer(
+        slot.linkLayer,
+        cssViewport,
+        pdfLinkRegions(annotations),
+        this.#activateLink,
+      );
+
       this.#renderedPages.set(pageNumber, { page, textLayer });
       slot.element.dataset.rendered = "true";
       this.#refreshSearchHighlights();
@@ -187,6 +203,7 @@ export class PageRenderer {
       slot.canvas.width = 0;
       slot.canvas.height = 0;
       slot.textLayer.replaceChildren();
+      slot.linkLayer.replaceChildren();
       delete slot.element.dataset.rendered;
     }
     rendered.textLayer?.cancel();

@@ -1,6 +1,7 @@
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { canvasDimensions, limitedScale } from "./render-math";
 import type { SavedDocumentSummary } from "./document-library";
+import { destinationPageNumber } from "./pdf-destination";
 
 type OutlineItem = {
   title: string;
@@ -401,20 +402,7 @@ export class DocumentSidebar {
     destination: string | unknown[],
   ): Promise<void> {
     try {
-      const resolved: unknown[] | null =
-        typeof destination === "string"
-          ? ((await document.getDestination(destination)) as unknown[] | null)
-          : destination;
-      if (this.#document !== document || !resolved || resolved.length === 0) return;
-      const target = resolved[0];
-      let pageNumber: number;
-      if (typeof target === "number") {
-        pageNumber = target + 1;
-      } else if (isPageReference(target)) {
-        pageNumber = (await document.getPageIndex(target)) + 1;
-      } else {
-        throw new Error("Unsupported PDF destination");
-      }
+      const pageNumber = await destinationPageNumber(document, destination);
       if (this.#document === document) this.#navigate(pageNumber);
     } catch {
       if (this.#document === document)
@@ -494,16 +482,6 @@ export class DocumentSidebar {
       button.disabled = false;
     }
   }
-}
-
-function isPageReference(value: unknown): value is { num: number; gen: number } {
-  if (!value || typeof value !== "object") return false;
-  return (
-    "num" in value &&
-    "gen" in value &&
-    typeof value.num === "number" &&
-    typeof value.gen === "number"
-  );
 }
 
 function documentOwner(): Document {

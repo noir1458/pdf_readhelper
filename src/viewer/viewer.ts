@@ -27,6 +27,8 @@ import { loadLocalFile, loadPdfUrl } from "./pdf-loader";
 import { renderPagePng } from "./page-exporter";
 import { PageRenderer } from "./page-renderer";
 import { PageTracker } from "./page-tracker";
+import { destinationPageNumber } from "./pdf-destination";
+import { namedActionPage, type PdfLinkTarget } from "./pdf-link-layer";
 import { PdfDocumentSearch, type PdfSearchMatch } from "./pdf-search";
 import { extractPdfRange } from "./range-extractor";
 import { fittedScale, type FitMode } from "./render-math";
@@ -309,7 +311,13 @@ async function openBytes(
   }
   const initialPage = Math.min(pdfDocument.numPages, Math.max(1, savedMetadata?.lastPage ?? 1));
   createSlots(pdfDocument.numPages);
-  renderer = new PageRenderer(pdfDocument, slots, session.snapshot.zoom);
+  renderer = new PageRenderer(
+    pdfDocument,
+    slots,
+    session.snapshot.zoom,
+    undefined,
+    (target) => void activatePdfLink(target),
+  );
   observeRendering();
   tracker.observe([...slots.values()].map((slot) => slot.element));
   totalPages.textContent = String(pdfDocument.numPages);
@@ -353,12 +361,14 @@ function createSlots(count: number): void {
     const textLayer = document.createElement("div");
     textLayer.className = "textLayer";
     textLayer.tabIndex = 0;
+    const linkLayer = document.createElement("div");
+    linkLayer.className = "pdf-link-layer";
     const label = document.createElement("span");
     label.className = "page-label";
     label.textContent = String(pageNumber);
-    element.append(canvas, textLayer, label);
+    element.append(canvas, textLayer, linkLayer, label);
     fragment.append(element);
-    slots.set(pageNumber, { pageNumber, element, canvas, textLayer, label });
+    slots.set(pageNumber, { pageNumber, element, canvas, textLayer, linkLayer, label });
   }
   pageStack.append(fragment);
 }
@@ -423,6 +433,25 @@ function navigateToPage(target: number, behavior: ScrollBehavior = "smooth"): bo
   updateCurrentPage(target);
   void renderNear(target);
   return true;
+}
+
+async function activatePdfLink(target: PdfLinkTarget): Promise<void> {
+  const document = session.snapshot.document;
+  if (!document || target.kind === "external") return;
+  try {
+    const pageNumber =
+      target.kind === "destination"
+        ? await destinationPageNumber(document, target.destination)
+        : namedActionPage(target.action, session.snapshot.currentPage, document.numPages);
+    if (session.snapshot.document !== document) return;
+    if (!pageNumber || !navigateToPage(pageNumber)) {
+      throw new Error("Unsupported PDF link target");
+    }
+  } catch {
+    if (session.snapshot.document === document) {
+      toast.show("Could not open that PDF link.", "error");
+    }
+  }
 }
 
 function toggleSearch(): void {

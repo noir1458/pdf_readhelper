@@ -22,5 +22,6 @@ export type PageSlot = {
   element: HTMLElement;
   canvas: HTMLCanvasElement;
   textLayer: HTMLDivElement;
+  linkLayer: HTMLDivElement;
   label: HTMLElement;
 };

@@ -395,6 +395,29 @@ button:disabled {
   color: transparent;
   background: rgba(255, 137, 45, 0.72);
 }
+.pdf-link-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pdf-link {
+  position: absolute;
+  display: block;
+  border-radius: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.pdf-link:hover {
+  background: rgba(65, 131, 226, 0.16);
+  outline: 1px solid rgba(65, 131, 226, 0.48);
+}
+.pdf-link:focus-visible {
+  background: rgba(112, 214, 177, 0.15);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .page-label {
   position: absolute;
   right: 8px;
