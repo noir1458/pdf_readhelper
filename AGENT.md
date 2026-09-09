@@ -209,6 +209,8 @@ Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke
 
 `Command+F` on macOS and `Ctrl+F` elsewhere open the extension's PDF search popover. Search extracts and caches each page's embedded text in memory with bounded concurrency, maps matches back to the lazy visible text layers, and uses Enter/Shift+Enter or arrow buttons for wrapped next/previous navigation. Scanned pages require an existing OCR text layer; the extension does not run OCR.
 
+When focus is in the PDF reading surface, Space/PageDown advance by 88% of the viewport, Shift+Space/PageUp move backward by the same amount, and Home/End navigate to the first/last page. These document-level shortcuts ignore repeated, modified, and already-handled events. Native key behavior remains available in interactive controls, links, the sidebar, the translation panel, and while real text is selected.
+
 ## 16. PDF Loading Strategy
 
 Supported inputs:
@@ -286,6 +288,7 @@ Unit tests cover:
 - per-page fit-width calculation for single-column and two-page spread layouts
 - saved-document title derivation
 - OpenAI Responses text extraction and translation cache-key separation
+- reading-key classification and overlap-preserving viewport offsets
 - PDF extraction using an in-memory generated fixture and output page-count/page-size checks
 
 Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, OpenAI translation, cached results, session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
@@ -353,7 +356,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 53 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 57 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -365,6 +368,7 @@ npm run check
 - [x] Added bounded clickable PDF link overlays for internal destinations and safe external URLs
 - [x] Added clockwise document view rotation shared by display, selectable layers, links, IMG, and AI capture
 - [x] Added continuous single-column and cover-first two-page spread layouts with per-sheet targeting and fit
+- [x] Added contextual Space/PageUp/PageDown/Home/End reading navigation with native-control and text-selection preservation
 
 ### In progress
 
@@ -374,7 +378,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider keyboard page-turn navigation or optional reading themes.
+3. After stable verification, consider original-PDF download/print actions or optional reading themes.
 
 ### Blockers
 
@@ -513,3 +517,11 @@ npm run check
 **Reason:** Technical books benefit from seeing facing pages while retaining the viewer's current lazy scrolling, search, and page-tracking model. A layout-only grid reuses every existing page slot and avoids a separate paginated renderer or duplicate canvases.
 
 **Consequences:** Spread mode may require horizontal scrolling at large manual zoom levels or on narrow windows. Layout resets to single-column when another PDF opens and does not affect IMG/AI output or extracted PDF structure.
+
+### 2026-09-09 — Keep reading keys contextual to the document surface
+
+**Decision:** Map Space/PageDown and Shift+Space/PageUp to smooth 88%-viewport movement, and Home/End to first/last-page navigation, only while the event belongs to the PDF reading surface. Do not intercept controls, links, sidebar or translation-panel content, active text selections, modified chords, or key-repeat events.
+
+**Reason:** Long documents benefit from predictable keyboard reading without requiring precise scrollbar or page-field interaction. A small viewport overlap preserves the reader's visual place, while contextual exclusions prevent the shortcuts from breaking buttons, inputs, links, or selectable text.
+
+**Consequences:** Holding a navigation key does not auto-repeat, and Home/End open the first/last page at its start rather than scrolling to an arbitrary pixel at the extreme boundary. Chrome runtime behavior still needs the normal unpacked-extension manual pass.

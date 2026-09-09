@@ -15,7 +15,11 @@ import { UrlPopover } from "../ui/url-popover";
 import { DocumentSession } from "./document-session";
 import { DocumentSidebar } from "./document-sidebar";
 import { hasFileDragType } from "./drag-data";
-import { isPageCopyShortcut } from "./keyboard-shortcuts";
+import {
+  isPageCopyShortcut,
+  readingNavigationAction,
+  readingScrollOffset,
+} from "./keyboard-shortcuts";
 import {
   DocumentLibrary,
   documentLibraryId,
@@ -167,6 +171,7 @@ searchInput.addEventListener("keydown", (event) => {
 });
 document.addEventListener("keydown", handlePageCopyShortcut);
 document.addEventListener("keydown", handlePdfSearchShortcut);
+document.addEventListener("keydown", handleReadingNavigationShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
 topbar.addEventListener("focusin", (event) => {
@@ -233,10 +238,38 @@ function handlePdfSearchShortcut(event: KeyboardEvent): void {
   openSearch();
 }
 
+function handleReadingNavigationShortcut(event: KeyboardEvent): void {
+  const action = readingNavigationAction(event);
+  if (!session.snapshot.document || !action || shouldKeepNativeReadingNavigation(event.target)) {
+    return;
+  }
+
+  event.preventDefault();
+  const offset = readingScrollOffset(action, scroller.clientHeight);
+  if (offset !== null) {
+    scroller.scrollBy({ top: offset, behavior: "smooth" });
+    return;
+  }
+  navigateToPage(action === "document-start" ? 1 : session.snapshot.totalPages);
+}
+
 function shouldKeepNativeCopy(target: EventTarget | null): boolean {
   if (
     target instanceof Element &&
     target.closest('input, textarea, select, [contenteditable="true"]')
+  ) {
+    return true;
+  }
+  const selection = window.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.toString());
+}
+
+function shouldKeepNativeReadingNavigation(target: EventTarget | null): boolean {
+  if (
+    target instanceof Element &&
+    target.closest(
+      'button, a, input, textarea, select, [contenteditable="true"], .topbar, .document-sidebar, .translation-panel',
+    )
   ) {
     return true;
   }

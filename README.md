@@ -16,6 +16,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Continuous single-column and book-style two-page spread layouts
 - Selectable PDF text with native copy behavior
 - Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
+- Reading navigation with Space/PageDown, Shift+Space/PageUp, and Home/End
 - Clickable PDF links with internal-page navigation and safe external-tab opening
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
@@ -135,8 +136,11 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 - **⌘F** on macOS / **Ctrl+F** elsewhere: search all text-bearing pages in the current PDF. Enter moves forward and Shift+Enter moves backward.
 - **⌘C** on macOS / **Ctrl+C** elsewhere while viewing the PDF: copy the current page as an image, matching the IMG button. Normal copy is preserved in inputs and when text is selected.
 - **⌘⇧C** on macOS / **Ctrl+Shift+C** elsewhere: copy current page
+- **Space** or **Page Down**: move forward by most of one viewport, retaining a small reading overlap.
+- **Shift+Space** or **Page Up**: move backward by most of one viewport.
+- **Home** / **End**: move to the first / last page.
 
-The plain copy shortcut works inside the viewer. The Shift variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
+Reading shortcuts apply to the PDF area only. Native behavior is preserved in toolbar controls, sidebar and translation content, links, inputs, and while text is selected. The plain copy shortcut works inside the viewer. The Shift copy variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
 
 ## Local PDFs
 
@@ -219,6 +223,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
 - [ ] Copy and explicitly retranslate a rotated page; verify the generated image follows the displayed orientation while PDF Range remains original
 - [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and clicking the right sheet updates the page counter
+- [ ] Use Space/PageDown, Shift+Space/PageUp, and Home/End over the PDF; confirm inputs, buttons, links, sidebar/translation content, and active text selections keep their native behavior
 - [ ] Select PDF text, press ⌘C/Ctrl+C, and confirm native text—not a page PNG—is copied
 - [ ] Open search with ⌘F/Ctrl+F, find a phrase across the full document, and navigate forward/backward with Enter/Shift+Enter and the arrow buttons
 - [ ] Click an internal page link and an external web link; confirm the former navigates in the viewer and the latter opens a new tab
