@@ -16,7 +16,7 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve };
 }
 
-function fixture() {
+function fixture(pageRotation = 0) {
   const renderTasks: (Deferred<null> & { cancel: ReturnType<typeof vi.fn> })[] = [];
   const renderPage = vi.fn(() => {
     const pending = deferred<null>();
@@ -24,13 +24,15 @@ function fixture() {
     renderTasks.push(task);
     return task as unknown as RenderTask;
   });
+  const getViewport = vi.fn(({ scale }: { scale: number }) => ({
+    width: 600 * scale,
+    height: 800 * scale,
+    scale,
+    userUnit: 1,
+  }));
   const page = {
-    getViewport: vi.fn(({ scale }: { scale: number }) => ({
-      width: 600 * scale,
-      height: 800 * scale,
-      scale,
-      userUnit: 1,
-    })),
+    rotate: pageRotation,
+    getViewport,
     render: renderPage,
     streamTextContent: vi.fn(() => new ReadableStream()),
     getAnnotations: vi.fn(() => Promise.resolve([])),
@@ -65,6 +67,7 @@ function fixture() {
   return {
     document,
     getPage,
+    getViewport,
     page,
     renderPage,
     renderTasks,
@@ -115,5 +118,19 @@ describe("PageRenderer", () => {
     secondTask.resolve(null);
     await replacement;
     expect(renderPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("adds view rotation to a page's intrinsic rotation", async () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    const { getViewport, renderTasks, renderer } = fixture(90);
+    renderer.setRotation(90);
+
+    const rendering = renderer.render(1);
+    await vi.waitFor(() => expect(renderTasks).toHaveLength(1));
+    expect(getViewport).toHaveBeenCalledWith({ scale: 1, rotation: 180 });
+    const renderTask = renderTasks[0];
+    if (!renderTask) throw new Error("Expected a rotated render task.");
+    renderTask.resolve(null);
+    await rendering;
   });
 });

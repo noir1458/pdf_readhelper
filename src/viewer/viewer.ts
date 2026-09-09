@@ -31,7 +31,7 @@ import { destinationPageNumber } from "./pdf-destination";
 import { namedActionPage, type PdfLinkTarget } from "./pdf-link-layer";
 import { PdfDocumentSearch, type PdfSearchMatch } from "./pdf-search";
 import { extractPdfRange } from "./range-extractor";
-import { fittedScale, type FitMode } from "./render-math";
+import { fittedScale, nextRotation, normalizeRotation, type FitMode } from "./render-math";
 import {
   MAX_VIEW_SCALE,
   MIN_VIEW_SCALE,
@@ -53,6 +53,7 @@ const topbar = requireElement<HTMLElement>(".topbar");
 const topbarRevealZone = requireElement<HTMLElement>("#topbar-reveal-zone");
 const sidebar = requireElement<HTMLElement>("#document-sidebar");
 const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
+const rotateButton = requireElement<HTMLButtonElement>("#rotate-clockwise");
 const searchButton = requireElement<HTMLButtonElement>("#search-pdf");
 const searchPopover = requireElement<HTMLElement>("#search-popover");
 const searchInput = requireElement<HTMLInputElement>("#search-input");
@@ -139,6 +140,7 @@ requireElement<HTMLButtonElement>("#fit-height").addEventListener(
   "click",
   () => void fitPage("height"),
 );
+rotateButton.addEventListener("click", rotateClockwise);
 sidebarToggle.addEventListener("click", () => setSidebarOpen(sidebar.hasAttribute("hidden")));
 pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
@@ -299,6 +301,7 @@ async function openBytes(
   pageStack.replaceChildren();
 
   const pdfDocument = await session.load(bytes, source);
+  updateRotationButton();
   documentSearch = new PdfDocumentSearch(pdfDocument);
   const libraryId = options.savedMetadata?.id ?? documentLibraryId(pdfDocument, source);
   let savedMetadata = options.savedMetadata;
@@ -677,7 +680,10 @@ async function fitPage(mode: FitMode): Promise<void> {
   if (!renderer) return;
   try {
     const page = await session.requireDocument().getPage(session.snapshot.currentPage);
-    const viewport = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({
+      scale: 1,
+      rotation: normalizeRotation(page.rotate + session.snapshot.rotation),
+    });
     const horizontalMargin = window.innerWidth <= 760 ? 24 : 56;
     const scale = fittedScale(
       viewport.width,
@@ -690,6 +696,25 @@ async function fitPage(mode: FitMode): Promise<void> {
   } catch (error) {
     toast.show(`Could not fit page: ${errorMessage(error)}`, "error");
   }
+}
+
+function rotateClockwise(): void {
+  if (!renderer) return;
+  const rotation = nextRotation(session.snapshot.rotation);
+  const pageNumber = session.snapshot.currentPage;
+  session.setRotation(rotation);
+  renderer.setRotation(rotation);
+  updateRotationButton();
+  void renderNear(pageNumber).then(() => {
+    slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
+  });
+  toast.show(`Rotated to ${rotation}°`, "success");
+}
+
+function updateRotationButton(): void {
+  const rotation = session.snapshot.rotation;
+  rotateButton.title = `Rotate clockwise · current ${rotation}°`;
+  rotateButton.setAttribute("aria-label", `Rotate clockwise, current rotation ${rotation} degrees`);
 }
 
 function setSidebarOpen(open: boolean): void {
@@ -758,7 +783,9 @@ async function requestPageTranslation(
   const controller = new AbortController();
   translationRequestController = controller;
   try {
-    const pageImage = await renderPagePng(pdfDocument, pageNumber);
+    const pageImage = await renderPagePng(pdfDocument, pageNumber, {
+      rotation: session.snapshot.rotation,
+    });
     const result = await translatePageImage(apiKey, pageImage, pageNumber, controller.signal);
     return await translationCache.put(
       documentId,
@@ -775,7 +802,9 @@ async function requestPageTranslation(
 async function copyPage(): Promise<void> {
   const pageNumber = session.snapshot.currentPage;
   try {
-    const blob = await renderPagePng(session.requireDocument(), pageNumber);
+    const blob = await renderPagePng(session.requireDocument(), pageNumber, {
+      rotation: session.snapshot.rotation,
+    });
     try {
       await writePngToClipboard(blob);
       toast.show(`Page ${pageNumber} copied`, "success");

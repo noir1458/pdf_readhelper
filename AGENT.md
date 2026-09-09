@@ -139,6 +139,7 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 - total page count
 - current page (updated only through `PageTracker` callback)
 - zoom mode/scale
+- document-session view rotation (`0`, `90`, `180`, or `270` degrees; reset when opening another document)
 - rendered page slots and render lifecycle
 - document-level load/error lifecycle
 
@@ -189,7 +190,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, search, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, search, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -220,7 +221,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides continuous vertical scrolling, current/total page display, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, direct page navigation, local picker/drop, and a dark neutral surround with white pages. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, and saved documents. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail and outline navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
@@ -230,7 +231,7 @@ Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` v
 
 ## 19. PNG Export
 
-`page-exporter.ts` obtains the PDF.js page and renders a low-resolution local analysis canvas. `content-bounds.ts` estimates a dominant neutral border color, ignores isolated pixel noise through row/column projections, and returns padded content bounds. Colored full-bleed, blank, unstable-border, and otherwise uncertain pages fall back to full-page bounds. The page exporter then renders a new temporary source canvas at scale `2.0`, reduced as needed to honor the pixel cap, maps the detected bounds into source pixels, and resamples the cropped result to 70%. It does not capture the screen, use AI/OCR, or depend on viewer zoom. Output is PNG only.
+`page-exporter.ts` obtains the PDF.js page and renders a low-resolution local analysis canvas using the active view rotation. `content-bounds.ts` estimates a dominant neutral border color, ignores isolated pixel noise through row/column projections, and returns padded content bounds. Colored full-bleed, blank, unstable-border, and otherwise uncertain pages fall back to full-page bounds. The page exporter then renders a new temporary source canvas at scale `2.0`, reduced as needed to honor the pixel cap, maps the detected bounds into source pixels, and resamples the cropped result to 70%. It does not capture the screen, use AI/OCR, or depend on viewer zoom. Output is PNG only.
 
 ## 20. Clipboard
 
@@ -280,6 +281,7 @@ Unit tests cover:
 - current-page scoring/hysteresis helper
 - export-scale pixel cap calculation
 - fit-width and fit-height scale calculation
+- clockwise rotation normalization, wrapping, and intrinsic/user rotation composition
 - saved-document title derivation
 - OpenAI Responses text extraction and translation cache-key separation
 - PDF extraction using an in-memory generated fixture and output page-count/page-size checks
@@ -349,7 +351,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 50 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 52 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -359,6 +361,7 @@ npm run check
 - [x] Added a paper/PDF brand icon as a vector source, Chrome icon PNG sizes, and viewer/popup favicon
 - [x] Added lazy selectable text layers and full-document Ctrl/Command+F search with exact result highlights
 - [x] Added bounded clickable PDF link overlays for internal destinations and safe external URLs
+- [x] Added clockwise document view rotation shared by display, selectable layers, links, IMG, and AI capture
 
 ### In progress
 
@@ -368,7 +371,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider page rotation or one-page/two-page layout modes.
+3. After stable verification, consider one-page/two-page layout modes.
 
 ### Blockers
 
@@ -491,3 +494,11 @@ npm run check
 **Reason:** Readers need references and web links to work, but PDF.js's complete annotation layer also covers forms, attachments, editing, and script-driven actions that are unnecessary for this private reading workflow. A small allowlisted layer is easier to audit and preserves the existing bounded render lifecycle.
 
 **Consequences:** Link rectangles require manual validation on rotated and mixed-size PDFs. Forms, popup comments, attachments, arbitrary named actions, and embedded PDF JavaScript remain unavailable by design.
+
+### 2026-09-09 — Treat rotation as document-session view state
+
+**Decision:** Add a clockwise toolbar action that cycles the active document through 0°, 90°, 180°, and 270°. Compose this view delta with every page's intrinsic PDF rotation and rerender the bounded canvas, text, search-highlight, and link layers. Apply the same effective rotation to IMG and AI page-image generation, while leaving original-object PDF range extraction unchanged.
+
+**Reason:** Landscape scans and incorrectly oriented pages need a fast reading control. Using one session rotation across display and image handoff prevents the viewer, clipboard, and translation request from disagreeing about orientation.
+
+**Consequences:** Rotation resets when another PDF is opened and does not alter the source PDF. Existing cached translations may still be displayed because their textual meaning is page-based; explicitly translating again sends the currently rotated image.

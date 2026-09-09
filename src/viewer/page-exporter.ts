@@ -6,8 +6,14 @@ import {
   MAX_EXPORT_PIXELS,
 } from "../shared/constants";
 import { UserFacingError } from "../shared/errors";
+import type { ViewRotation } from "../shared/types";
 import { detectContentBounds, scaleBounds } from "./content-bounds";
-import { canvasDimensions, limitedScale } from "./render-math";
+import { canvasDimensions, limitedScale, normalizeRotation } from "./render-math";
+
+type PagePngOptions = {
+  requestedScale?: number;
+  rotation?: ViewRotation;
+};
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -21,15 +27,17 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 export async function renderPagePng(
   document: PDFDocumentProxy,
   pageNumber: number,
-  requestedScale = DEFAULT_EXPORT_SCALE,
+  options: PagePngOptions = {},
 ): Promise<Blob> {
+  const { requestedScale = DEFAULT_EXPORT_SCALE, rotation: viewRotation = 0 } = options;
   const page = await document.getPage(pageNumber);
-  const base = page.getViewport({ scale: 1 });
+  const rotation = normalizeRotation(page.rotate + viewRotation);
+  const base = page.getViewport({ scale: 1, rotation });
   const analysisScale = Math.min(
     1,
     EXPORT_ANALYSIS_MAX_DIMENSION / Math.max(base.width, base.height),
   );
-  const analysisViewport = page.getViewport({ scale: analysisScale });
+  const analysisViewport = page.getViewport({ scale: analysisScale, rotation });
   const analysisDimensions = canvasDimensions(base.width, base.height, analysisScale);
   const analysisCanvas = documentOwnerCanvas();
   const sourceCanvas = documentOwnerCanvas();
@@ -45,7 +53,7 @@ export async function renderPagePng(
     );
 
     const scale = limitedScale(base.width, base.height, requestedScale, MAX_EXPORT_PIXELS);
-    const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale, rotation });
     const dimensions = canvasDimensions(base.width, base.height, scale);
     sourceCanvas.width = dimensions.width;
     sourceCanvas.height = dimensions.height;

@@ -1,5 +1,16 @@
+import type { ViewRotation } from "../shared/types";
+
 export type Dimensions = { width: number; height: number };
 export type FitMode = "width" | "height";
+
+export function normalizeRotation(value: number): ViewRotation {
+  const normalized = (((Math.round(value / 90) * 90) % 360) + 360) % 360;
+  return normalized as ViewRotation;
+}
+
+export function nextRotation(value: ViewRotation): ViewRotation {
+  return normalizeRotation(value + 90);
+}
 
 export function limitedScale(
   baseWidth: number,

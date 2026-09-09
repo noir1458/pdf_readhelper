@@ -1,9 +1,9 @@
 import { TextLayer, type PDFDocumentProxy, type PDFPageProxy, type RenderTask } from "pdfjs-dist";
 import { MAX_DISPLAY_PIXELS, RELEASE_RADIUS } from "../shared/constants";
-import type { PageSlot } from "../shared/types";
+import type { PageSlot, ViewRotation } from "../shared/types";
 import { pdfLinkRegions, renderPdfLinkLayer, type PdfLinkTarget } from "./pdf-link-layer";
 import type { PdfSearchMatch, SearchTextRange } from "./pdf-search";
-import { canvasDimensions, limitedScale } from "./render-math";
+import { canvasDimensions, limitedScale, normalizeRotation } from "./render-math";
 
 type RenderJob = {
   generation: number;
@@ -31,6 +31,7 @@ export class PageRenderer {
   #searchMatches: PdfSearchMatch[] = [];
   #activeSearchMatch = -1;
   #zoom: number;
+  #rotation: ViewRotation = 0;
   #generation = 0;
   #disposed = false;
 
@@ -50,6 +51,11 @@ export class PageRenderer {
 
   setZoom(zoom: number): void {
     this.#zoom = zoom;
+    this.releaseAll();
+  }
+
+  setRotation(rotation: ViewRotation): void {
+    this.#rotation = rotation;
     this.releaseAll();
   }
 
@@ -85,15 +91,16 @@ export class PageRenderer {
     try {
       page = await this.#document.getPage(pageNumber);
       if (!this.#isCurrent(job)) return;
-      const baseViewport = page.getViewport({ scale: 1 });
-      const cssViewport = page.getViewport({ scale: this.#zoom });
+      const rotation = normalizeRotation(page.rotate + this.#rotation);
+      const baseViewport = page.getViewport({ scale: 1, rotation });
+      const cssViewport = page.getViewport({ scale: this.#zoom, rotation });
       const outputScale = limitedScale(
         baseViewport.width,
         baseViewport.height,
         this.#zoom * devicePixelRatio,
         MAX_DISPLAY_PIXELS,
       );
-      const renderViewport = page.getViewport({ scale: outputScale });
+      const renderViewport = page.getViewport({ scale: outputScale, rotation });
       const dimensions = canvasDimensions(baseViewport.width, baseViewport.height, outputScale);
 
       slot.element.style.setProperty(

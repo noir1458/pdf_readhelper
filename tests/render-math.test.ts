@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canvasDimensions, fittedScale, limitedScale } from "../src/viewer/render-math";
+import {
+  canvasDimensions,
+  fittedScale,
+  limitedScale,
+  nextRotation,
+  normalizeRotation,
+} from "../src/viewer/render-math";
 
 describe("render sizing", () => {
   it("keeps scale below the pixel cap", () => {
@@ -19,5 +25,11 @@ describe("render sizing", () => {
   it("falls back safely for invalid fit dimensions", () => {
     expect(fittedScale(0, 800, 900, 700, "width")).toBe(1);
     expect(fittedScale(600, 800, 900, -1, "height")).toBe(1);
+  });
+
+  it("normalizes PDF and view rotations into clockwise quarter turns", () => {
+    expect(normalizeRotation(450)).toBe(90);
+    expect(normalizeRotation(-90)).toBe(270);
+    expect(nextRotation(270)).toBe(0);
   });
 });
