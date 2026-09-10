@@ -110,6 +110,19 @@
           </svg>
         </button>
         <button
+          id="toggle-page-flow"
+          class="icon-button"
+          type="button"
+          aria-label="Use page-turn mode"
+          title="Use page-turn mode"
+          aria-pressed="false"
+          disabled
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4h13v16H4zM14 9l3 3-3 3M17 12h4" />
+          </svg>
+        </button>
+        <button
           id="history-back"
           class="icon-button history-button"
           type="button"
@@ -479,8 +492,36 @@
         id="viewer-scroller"
         class="viewer-scroller"
         tabindex="0"
-        aria-keyshortcuts="Space Shift+Space PageDown PageUp Home End"
+        aria-keyshortcuts="Space Shift+Space PageDown PageUp Home End ArrowLeft ArrowRight"
       >
+        <div
+          id="page-turn-controls"
+          class="page-turn-controls"
+          role="group"
+          aria-label="Page turn controls"
+          hidden
+        >
+          <button
+            id="turn-page-previous"
+            class="page-turn-button page-turn-previous icon-button"
+            type="button"
+            aria-label="Previous page or spread"
+            title="Previous page or spread (Left Arrow)"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+          </button>
+          <button
+            id="turn-page-next"
+            class="page-turn-button page-turn-next icon-button"
+            type="button"
+            aria-label="Next page or spread"
+            title="Next page or spread (Right Arrow)"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+          </button>
+        </div>
         <section id="empty-state" class="empty-state">
           <div class="empty-card">
             <div class="document-mark" aria-hidden="true">PDF</div>

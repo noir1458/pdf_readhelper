@@ -97,6 +97,7 @@ pdf_readhelper/
 │       ├── document-library.ts
 │       ├── page-exporter.ts
 │       ├── page-navigation-history.ts
+│       ├── page-flow.ts
 │       ├── page-renderer.ts
 │       ├── page-tracker.ts
 │       ├── range-extractor.ts
@@ -159,6 +160,8 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 
 `FocusMode` owns temporary distraction-free state and the browser Fullscreen API handshake. It hides viewer chrome without changing sidebar or translation-panel open state, restores normal UI when native fullscreen ends, and remains usable as an in-page focus mode when Chrome rejects the fullscreen request.
 
+The viewer-wide `PageFlow` preference is `continuous` or `paged` and persists in extension-page `localStorage`. Paged flow exposes only the active single page or cover-first spread while retaining the same bounded renderer, page tracker, layout state, and current-page action target. It is separate from per-document `PageLayout`, which still resets to single when another document opens.
+
 Short operation state (copying/extracting) belongs to the toolbar controller and is reflected with disabled/busy controls. It must not mutate document state.
 
 ## 11. Message Contracts
@@ -202,7 +205,7 @@ Errors are not swallowed. Console output may contain technical error objects dur
 
 ## 14. UX Specification
 
-The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, previous view, next view, focus mode, reading theme, current-page bookmark, search, original download, original print, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
+The top bar keeps its opening actions on the left and one contiguous page-control group on the right, ordered zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, page flow, previous view, next view, focus mode, reading theme, current-page bookmark, search, original download, original print, IMG, PDF, AI, and current/total page. **Open URL** reveals a compact form instead of permanently reserving space for an input. When idle, non-page controls animate upward while the remaining IMG/PDF/AI actions and page field stay translucently in their exact expanded-toolbar positions. Buttons include `aria-label`, `title`, keyboard focus, and busy/disabled states.
 
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
@@ -211,6 +214,7 @@ The top bar keeps its opening actions on the left and one contiguous page-contro
 - The fourth sidebar view lists the active PDF's bookmarked pages by title, optional short note, and page number. Selecting one navigates to it; `✎` opens an inline title/note editor and `×` removes it. Enter saves edits, while Escape or Cancel restores the row without changes. A blank edited title falls back to `Page N`. The toolbar ribbon toggles the current page and exposes its state with `aria-pressed`.
 - Previous/next view buttons traverse explicit page jumps from thumbnails, outline entries, bookmarks, search results, PDF links, the page field, and Home/End. Continuous scrolling does not flood the history; the actual page visible when the reader next jumps replaces that departure point. Opening another PDF clears the history.
 - Focus mode requests browser fullscreen and hides the complete top toolbar, sidebar, and translation panel while retaining their underlying open state for restoration. F or Escape exits; failure to obtain browser fullscreen leaves the in-page distraction-free mode active with a toast explanation.
+- Page flow toggles between the existing continuous stack and a persisted page-turn presentation. Paged flow reveals only the active page in single layout or the active cover-first pair in spread layout, centers short pages safely, retains scrolling for oversized/zoomed pages, and shows translucent edge turn buttons. Returning to continuous flow unhides the existing slots without recreating the document.
 - AI opens a closable right panel. Its key form explains session-only handling and external page-image transmission. Translation never starts from scrolling or merely opening the panel. Cached results appear automatically and can be copied as text; explicit retranslation replaces the cached result.
 - No `alert()`; use non-blocking accessible live-region toasts.
 
@@ -225,6 +229,8 @@ Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke
 `Command+F` on macOS and `Ctrl+F` elsewhere open the extension's PDF search popover. Search extracts and caches each page's embedded text in memory with bounded concurrency, maps matches back to the lazy visible text layers, and uses Enter/Shift+Enter or arrow buttons for wrapped next/previous navigation. Scanned pages require an existing OCR text layer; the extension does not run OCR.
 
 When focus is in the PDF reading surface, Space/PageDown advance by 88% of the viewport, Shift+Space/PageUp move backward by the same amount, and Home/End navigate to the first/last page. These document-level shortcuts ignore repeated, modified, and already-handled events. Native key behavior remains available in interactive controls, links, the sidebar, the translation panel, and while real text is selected.
+
+In paged flow, unmodified Left/Right Arrow turn the previous/next single page or cover-first spread. Space/PageDown and Shift+Space/PageUp reuse the same turn operation instead of viewport scrolling. Page turns do not populate explicit jump history; direct page, outline, bookmark, search, link, and Home/End jumps continue to do so.
 
 Alt+Left Arrow and Alt+Right Arrow traverse the active PDF's previous/next page-jump locations when that direction exists. They do not intercept input, textarea, select, or editable-element behavior, and they leave the browser chord untouched when no corresponding internal history entry exists.
 
@@ -245,7 +251,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides continuous vertical scrolling, current/total page display, bounded previous/next page-jump history, a temporary focus/fullscreen mode, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, editable per-PDF page bookmarks with short notes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, saved documents, and the active PDF's bookmarks. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail, outline, and bookmark navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides persistent continuous-scroll and page-turn flows, current/total page display, bounded previous/next page-jump history, a temporary focus/fullscreen mode, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, editable per-PDF page bookmarks with short notes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. Paged flow hides non-active slots instead of building a second renderer, while continuous flow restores the complete vertical stack. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, saved documents, and the active PDF's bookmarks. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail, outline, and bookmark navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
@@ -307,6 +313,7 @@ Unit tests cover:
 - URL/source classification and query normalization
 - current-page scoring/hysteresis helper
 - bounded page-jump history, branch replacement, scroll-adjusted departure points, and Alt+Arrow classification
+- page-flow normalization/persistence, cover-first visible groups, turn boundaries, and Arrow classification
 - export-scale pixel cap calculation
 - fit-width and fit-height scale calculation
 - clockwise rotation normalization, wrapping, and intrinsic/user rotation composition
@@ -352,6 +359,7 @@ npm run check
 - Public/authenticated PDF URLs may fail due to CORS/auth/session restrictions.
 - Direct `file://` fetch requires the Chrome toggle and must be manually tested.
 - Browser fullscreen is best-effort and requires a user gesture; if Chrome refuses it, only the extension's in-page focus mode is applied.
+- Paged flow changes page-level visibility only; zoomed pages can still require horizontal or vertical scrolling within the current page/spread.
 - Desktop Chrome has no general extension API for direct PDF printer submission. Original printing first uses an invisible PDF frame, then falls back to a native PDF viewer tab when framed printing is unavailable.
 - PDF.js worker loading under MV3 CSP must be manually tested in Chrome.
 - Image clipboard writes must be manually tested in a focused extension tab.
@@ -385,7 +393,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 82 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 87 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -404,6 +412,7 @@ npm run check
 - [x] Added inline bookmark title editing and optional short per-page notes with Enter/Escape controls
 - [x] Added bounded per-document previous/next page-jump history with toolbar and Alt+Arrow controls
 - [x] Added temporary focus/fullscreen reading mode with full viewer-chrome hiding and F/Escape controls
+- [x] Added persisted page-turn flow with single/spread grouping, edge controls, and contextual reading keys
 
 ### In progress
 
@@ -413,7 +422,7 @@ npm run check
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
-3. After stable verification, consider presentation-style paged navigation or optional reading-progress statistics.
+3. After stable verification, consider optional reading-progress statistics or a compact settings surface for export/model preferences.
 
 ### Blockers
 
@@ -608,3 +617,11 @@ npm run check
 **Reason:** Reading benefits from a genuinely distraction-free canvas, but browser fullscreen availability depends on user activation and runtime policy. Separating the UI state from the browser request provides a reliable feature while still using the maximum screen area when permitted.
 
 **Consequences:** Focus mode is intentionally session-only and does not persist. Fullscreen entry, Escape behavior, restored sidebar/panel state, and toolbar animation require manual verification in the unpacked extension.
+
+### 2026-09-10 — Reuse page slots for a persisted page-turn flow
+
+**Decision:** Add a viewer-wide continuous/paged preference in localStorage. In paged flow, hide every existing page slot except the current single page or cover-first spread and turn with edge buttons, Left/Right, or the existing Space/Page key family. Keep page turns out of explicit jump history and restore all slots when returning to continuous flow.
+
+**Reason:** Focus mode benefits from an ebook-like presentation, but a second renderer or paginated document model would duplicate canvas, text, link, search, and current-page behavior. Reusing the bounded slots preserves one source of truth while providing discrete page navigation.
+
+**Consequences:** Paged flow remembers its viewer-wide setting, while single/spread layout remains per-document and resets on document changes. Oversized pages still scroll inside the viewer, and page visibility, centering, edge controls, keyboard focus exclusions, and persistence require manual Chrome verification.

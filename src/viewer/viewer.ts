@@ -26,6 +26,15 @@ import {
 } from "./keyboard-shortcuts";
 import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
+  pagedViewPages,
+  pageTurnShortcutDirection,
+  pageTurnTarget,
+  readPageFlow,
+  writePageFlow,
+  type PageFlow,
+  type PageTurnDirection,
+} from "./page-flow";
+import {
   PageNavigationHistory,
   pageHistoryShortcutDirection,
   type PageHistoryDirection,
@@ -84,6 +93,10 @@ const sidebar = requireElement<HTMLElement>("#document-sidebar");
 const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
 const rotateButton = requireElement<HTMLButtonElement>("#rotate-clockwise");
 const pageLayoutButton = requireElement<HTMLButtonElement>("#toggle-page-layout");
+const pageFlowButton = requireElement<HTMLButtonElement>("#toggle-page-flow");
+const pageTurnControls = requireElement<HTMLElement>("#page-turn-controls");
+const previousPageButton = requireElement<HTMLButtonElement>("#turn-page-previous");
+const nextPageButton = requireElement<HTMLButtonElement>("#turn-page-next");
 const searchButton = requireElement<HTMLButtonElement>("#search-pdf");
 const searchPopover = requireElement<HTMLElement>("#search-popover");
 const searchInput = requireElement<HTMLInputElement>("#search-input");
@@ -117,6 +130,8 @@ let searchMatches: PdfSearchMatch[] = [];
 let activeSearchMatch = -1;
 let currentBookmarks = new Map<number, PageBookmark>();
 let bookmarkBusy = false;
+let pageFlow: PageFlow = readPageFlow();
+let pagedVisiblePages = new Set<number>();
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -167,6 +182,8 @@ const focusMode = new FocusMode(document.body, focusModeButton, {
   },
 });
 
+applyPageFlow();
+
 new ReadingThemePicker(
   requireElement<HTMLElement>("#theme-popover"),
   requireElement<HTMLButtonElement>("#reading-theme"),
@@ -205,6 +222,9 @@ requireElement<HTMLButtonElement>("#fit-height").addEventListener(
 );
 rotateButton.addEventListener("click", rotateClockwise);
 pageLayoutButton.addEventListener("click", togglePageLayout);
+pageFlowButton.addEventListener("click", togglePageFlow);
+previousPageButton.addEventListener("click", () => turnPage("previous"));
+nextPageButton.addEventListener("click", () => turnPage("next"));
 historyBackButton.addEventListener("click", () => navigatePageHistory("back"));
 historyForwardButton.addEventListener("click", () => navigatePageHistory("forward"));
 sidebarToggle.addEventListener("click", () => setSidebarOpen(sidebar.hasAttribute("hidden")));
@@ -229,6 +249,7 @@ searchInput.addEventListener("keydown", (event) => {
 document.addEventListener("keydown", handlePageCopyShortcut);
 document.addEventListener("keydown", handlePdfSearchShortcut);
 document.addEventListener("keydown", handleReadingNavigationShortcut);
+document.addEventListener("keydown", handlePageTurnShortcut);
 document.addEventListener("keydown", handlePageHistoryShortcut);
 document.addEventListener("keydown", handleFocusModeShortcut);
 document.addEventListener("keydown", handleOriginalDocumentShortcut);
@@ -306,12 +327,28 @@ function handleReadingNavigationShortcut(event: KeyboardEvent): void {
   }
 
   event.preventDefault();
+  if (
+    pageFlow === "paged" &&
+    (action === "viewport-forward" || action === "viewport-backward")
+  ) {
+    turnPage(action === "viewport-forward" ? "next" : "previous");
+    return;
+  }
   const offset = readingScrollOffset(action, scroller.clientHeight);
   if (offset !== null) {
     scroller.scrollBy({ top: offset, behavior: "smooth" });
     return;
   }
   navigateToPage(action === "document-start" ? 1 : session.snapshot.totalPages);
+}
+
+function handlePageTurnShortcut(event: KeyboardEvent): void {
+  const direction = pageTurnShortcutDirection(event, pageFlow);
+  if (!session.snapshot.document || !direction || shouldKeepNativeReadingNavigation(event.target)) {
+    return;
+  }
+  event.preventDefault();
+  turnPage(direction);
 }
 
 function handlePageHistoryShortcut(event: KeyboardEvent): void {
@@ -457,6 +494,9 @@ async function openBytes(
   setSidebarOpen(false);
   sidebarToggle.disabled = true;
   focusMode.setAvailable(false);
+  pageFlowButton.disabled = true;
+  pagedVisiblePages.clear();
+  updatePageTurnButtons();
   downloadOriginalButton.disabled = true;
   printOriginalButton.disabled = true;
   slots.clear();
@@ -498,6 +538,7 @@ async function openBytes(
   scheduleTopbarCollapse();
   sidebarToggle.disabled = false;
   focusMode.setAvailable(true);
+  pageFlowButton.disabled = false;
   searchButton.disabled = false;
   downloadOriginalButton.disabled = false;
   printOriginalButton.disabled = false;
@@ -527,6 +568,7 @@ function createSlots(count: number): void {
   for (let pageNumber = 1; pageNumber <= count; pageNumber += 1) {
     const element = document.createElement("article");
     element.className = "page-slot";
+    element.hidden = pageFlow === "paged";
     element.dataset.pageNumber = String(pageNumber);
     element.setAttribute("aria-label", `Page ${pageNumber}`);
     element.addEventListener("pointerdown", () => updateCurrentPage(pageNumber));
@@ -583,11 +625,13 @@ async function renderNear(pageNumber: number): Promise<void> {
 
 function updateCurrentPage(pageNumber: number): void {
   session.setCurrentPage(pageNumber);
+  updatePagedPageVisibility();
   tracker.setCurrentPage(pageNumber);
   pageInput.value = String(pageNumber);
   toolbar.setCurrentPage(pageNumber);
   documentSidebar.setCurrentPage(pageNumber);
   updateBookmarkButton();
+  updatePageTurnButtons();
   scheduleReadingPositionSave(pageNumber);
   renderer?.releaseDistant(pageNumber);
   if (translationPanel.isOpen) void loadCachedTranslation(pageNumber);
@@ -612,8 +656,9 @@ function navigateToPage(
     pageNavigationHistory.record(session.snapshot.currentPage, target);
     updatePageHistoryButtons();
   }
+  if (pageFlow === "paged") updateCurrentPage(target);
   slot.element.scrollIntoView({ behavior, block: "start" });
-  updateCurrentPage(target);
+  if (pageFlow !== "paged") updateCurrentPage(target);
   void renderNear(target);
   return true;
 }
@@ -1070,16 +1115,109 @@ function togglePageLayout(): void {
   toast.show(session.snapshot.pageLayout === "spread" ? "Two-page spread" : "Single-page layout");
 }
 
+function togglePageFlow(): void {
+  pageFlow = pageFlow === "continuous" ? "paged" : "continuous";
+  writePageFlow(pageFlow);
+  applyPageFlow();
+  const pageNumber = session.snapshot.currentPage;
+  window.requestAnimationFrame(() => {
+    slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
+  });
+  if (session.snapshot.document) void renderNear(pageNumber);
+  toast.show(pageFlow === "paged" ? "Page-turn mode" : "Continuous scrolling");
+}
+
+function applyPageFlow(): void {
+  pageStack.dataset.flow = pageFlow;
+  scroller.dataset.pageFlow = pageFlow;
+  const paged = pageFlow === "paged";
+  pageFlowButton.setAttribute("aria-pressed", String(paged));
+  const label = paged ? "Use continuous scrolling" : "Use page-turn mode";
+  pageFlowButton.setAttribute("aria-label", label);
+  pageFlowButton.title = label;
+
+  if (paged) {
+    for (const slot of slots.values()) slot.element.hidden = true;
+    pagedVisiblePages.clear();
+    updatePagedPageVisibility();
+  } else {
+    for (const slot of slots.values()) slot.element.hidden = false;
+    pagedVisiblePages.clear();
+  }
+  updatePageStackLabel();
+  updatePageTurnButtons();
+}
+
+function updatePagedPageVisibility(): void {
+  if (pageFlow !== "paged") return;
+  const nextPages = new Set(
+    pagedViewPages(
+      session.snapshot.currentPage,
+      session.snapshot.totalPages,
+      session.snapshot.pageLayout,
+    ),
+  );
+  for (const pageNumber of pagedVisiblePages) {
+    if (!nextPages.has(pageNumber)) {
+      const slot = slots.get(pageNumber);
+      if (slot) slot.element.hidden = true;
+    }
+  }
+  for (const pageNumber of nextPages) {
+    const slot = slots.get(pageNumber);
+    if (slot) slot.element.hidden = false;
+  }
+  pagedVisiblePages = nextPages;
+}
+
+function turnPage(direction: PageTurnDirection): void {
+  if (pageFlow !== "paged") return;
+  const target = pageTurnTarget(
+    session.snapshot.currentPage,
+    session.snapshot.totalPages,
+    session.snapshot.pageLayout,
+    direction,
+  );
+  if (target === null) return;
+  navigateToPage(target, "auto", false);
+}
+
+function updatePageTurnButtons(): void {
+  const canTurn = pageFlow === "paged" && Boolean(session.snapshot.document);
+  pageTurnControls.hidden = !canTurn;
+  previousPageButton.disabled =
+    !canTurn ||
+    pageTurnTarget(
+      session.snapshot.currentPage,
+      session.snapshot.totalPages,
+      session.snapshot.pageLayout,
+      "previous",
+    ) === null;
+  nextPageButton.disabled =
+    !canTurn ||
+    pageTurnTarget(
+      session.snapshot.currentPage,
+      session.snapshot.totalPages,
+      session.snapshot.pageLayout,
+      "next",
+    ) === null;
+}
+
 function updatePageLayout(): void {
   const spread = session.snapshot.pageLayout === "spread";
   pageStack.dataset.layout = session.snapshot.pageLayout;
-  pageStack.setAttribute(
-    "aria-label",
-    spread ? "PDF pages, two-page spread" : "PDF pages, single column",
-  );
+  updatePagedPageVisibility();
+  updatePageStackLabel();
+  updatePageTurnButtons();
   pageLayoutButton.setAttribute("aria-pressed", String(spread));
   pageLayoutButton.title = spread ? "Use single-page layout" : "Use two-page spread";
   pageLayoutButton.setAttribute("aria-label", pageLayoutButton.title);
+}
+
+function updatePageStackLabel(): void {
+  const layout = session.snapshot.pageLayout === "spread" ? "two-page spread" : "single page";
+  const flow = pageFlow === "paged" ? "page-turn mode" : "continuous scrolling";
+  pageStack.setAttribute("aria-label", `PDF pages, ${layout}, ${flow}`);
 }
 
 function setSidebarOpen(open: boolean): void {

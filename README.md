@@ -18,6 +18,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Selectable PDF text with native copy behavior
 - Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
 - Reading navigation with Space/PageDown, Shift+Space/PageUp, and Home/End
+- Persistent continuous-scroll or page-turn reading flow with single-page and spread support
 - Clickable PDF links with internal-page navigation and safe external-tab opening
 - Original PDF download and print handoff without rerendering every page
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
@@ -87,13 +88,14 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, previous/next view, focus mode, reading theme, bookmark, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
+- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, page flow, previous/next view, focus mode, reading theme, bookmark, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
+- Use the page-and-arrow button to switch between continuous scrolling and page-turn mode. Page-turn mode shows only the current page or cover-first spread, adds translucent previous/next buttons at the viewer edges, and supports Left/Right Arrow, Space, Shift+Space, Page Up, and Page Down. The selected flow persists locally across viewer tabs and browser restarts.
 - Use the left/right arrows to return through explicit page jumps made by thumbnails, the outline, bookmarks, search, PDF links, the page field, or Home/End. Ordinary scrolling is not added page by page; the actual page reached before the next jump becomes the return point. A new jump after going back clears the old forward branch, and opening another PDF resets the history.
 - Use the four-corner button or press **F** to enter focus mode. It requests browser fullscreen and temporarily hides the toolbar, sidebar, and translation panel without closing them. Press **F** or **Escape** to restore the previous layout. If Chrome refuses fullscreen, the distraction-free viewer mode still works.
 - Use the palette button to choose Original, Sepia, or Dark. The preference persists locally across viewer tabs. It changes only the visible page canvases and reading surround; thumbnails, copied PNGs, AI input, downloaded PDFs, and printing retain original colors.
@@ -164,8 +166,9 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 - **Home** / **End**: move to the first / last page.
 - **Alt+Left Arrow** / **Alt+Right Arrow**: move to the previous / next page-jump location. Inputs retain their native arrow behavior.
 - **F**: enter or exit focus/fullscreen reading mode. **Escape** also exits while focus mode is active.
+- **Left Arrow** / **Right Arrow**: turn the previous / next page or spread while page-turn mode is active.
 
-Reading shortcuts apply to the PDF area only. Native behavior is preserved in toolbar controls, sidebar and translation content, links, inputs, and while text is selected. The plain copy shortcut works inside the viewer. The Shift copy variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
+Reading shortcuts apply to the PDF area only. In page-turn mode, Space/Page Down and Shift+Space/Page Up turn pages instead of scrolling the viewport. Native behavior is preserved in toolbar controls, sidebar and translation content, links, inputs, and while text is selected. The plain copy shortcut works inside the viewer. The Shift copy variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
 
 ## Local PDFs
 
@@ -189,6 +192,7 @@ Chrome controls this setting; the extension cannot enable it automatically.
 - `@cantoo/pdf-lib` for original page copying
 - Viewer-owned PDF bytes and state
 - IndexedDB-backed saved-document metadata, PDF bytes, cover thumbnail, and last-read page
+- LocalStorage-backed reading theme and continuous/page-turn flow preferences
 - Separate IndexedDB translation cache containing returned text and token counts, never API keys or page images
 - Direct Responses API client for explicitly requested current-page translation
 - Service worker limited to keyboard-command routing
@@ -251,6 +255,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
 - [ ] Copy and explicitly retranslate a rotated page; verify the generated image follows the displayed orientation while PDF Range remains original
 - [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and clicking the right sheet updates the page counter
+- [ ] Toggle page-turn mode in single and spread layouts; verify edge buttons, Left/Right, Space/Page Down, Shift+Space/Page Up, first/last boundaries, continuous-mode restoration, and persistence after reload
 - [ ] Switch among Original, Sepia, and Dark; reload the viewer to confirm persistence and verify IMG/AI/PDF/print outputs keep original colors
 - [ ] Use Space/PageDown, Shift+Space/PageUp, and Home/End over the PDF; confirm inputs, buttons, links, sidebar/translation content, and active text selections keep their native behavior
 - [ ] Select PDF text, press ⌘C/Ctrl+C, and confirm native text—not a page PNG—is copied
