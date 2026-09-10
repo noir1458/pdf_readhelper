@@ -9,6 +9,7 @@ import type { PageSlot, PdfSource } from "../shared/types";
 import { OPENAI_TRANSLATION_MODEL, translatePageImage } from "../translation/openai-translation";
 import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
 import { DocumentToolbar } from "../ui/document-toolbar";
+import { FocusMode } from "../ui/focus-mode";
 import { ReadingThemePicker } from "../ui/reading-theme-picker";
 import { TranslationPanel } from "../ui/translation-panel";
 import { Toast } from "../ui/toast";
@@ -18,6 +19,7 @@ import { DocumentSidebar } from "./document-sidebar";
 import { hasFileDragType } from "./drag-data";
 import {
   isPageCopyShortcut,
+  focusModeShortcutAction,
   originalDocumentShortcutAction,
   readingNavigationAction,
   readingScrollOffset,
@@ -93,6 +95,7 @@ const printOriginalButton = requireElement<HTMLButtonElement>("#print-original")
 const bookmarkButton = requireElement<HTMLButtonElement>("#toggle-bookmark");
 const historyBackButton = requireElement<HTMLButtonElement>("#history-back");
 const historyForwardButton = requireElement<HTMLButtonElement>("#history-forward");
+const focusModeButton = requireElement<HTMLButtonElement>("#focus-mode");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
 const tracker = new PageTracker(scroller, updateCurrentPage);
 const documentLibrary = new DocumentLibrary();
@@ -152,6 +155,16 @@ const translationPanel = new TranslationPanel(requireElement<HTMLElement>("#tran
   translate: requestPageTranslation,
   reportError: (message) => toast.show(message, "error", 6500),
   openChanged: (open) => toolbar.setTranslationOpen(open),
+});
+
+const focusMode = new FocusMode(document.body, focusModeButton, {
+  changed: (active) => {
+    if (!active) showFullTopbar();
+    toast.show(active ? "Focus mode · press F or Esc to exit" : "Focus mode off");
+  },
+  fullscreenFailed: () => {
+    toast.show("Browser fullscreen was unavailable. Focus mode is still active.", "error", 5200);
+  },
 });
 
 new ReadingThemePicker(
@@ -217,6 +230,7 @@ document.addEventListener("keydown", handlePageCopyShortcut);
 document.addEventListener("keydown", handlePdfSearchShortcut);
 document.addEventListener("keydown", handleReadingNavigationShortcut);
 document.addEventListener("keydown", handlePageHistoryShortcut);
+document.addEventListener("keydown", handleFocusModeShortcut);
 document.addEventListener("keydown", handleOriginalDocumentShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
@@ -242,6 +256,7 @@ window.addEventListener("beforeunload", () => {
   renderObserver?.disconnect();
   renderer?.dispose();
   documentSidebar.dispose();
+  focusMode.dispose();
   void session.destroy();
 });
 document.addEventListener("visibilitychange", () => {
@@ -313,6 +328,24 @@ function handlePageHistoryShortcut(event: KeyboardEvent): void {
   navigatePageHistory(direction);
 }
 
+function handleFocusModeShortcut(event: KeyboardEvent): void {
+  const action = focusModeShortcutAction(event, focusMode.isActive);
+  if (!action) return;
+  if (action === "exit") {
+    event.preventDefault();
+    void focusMode.exit();
+    return;
+  }
+  if (focusMode.isActive) {
+    event.preventDefault();
+    void focusMode.exit();
+    return;
+  }
+  if (!session.snapshot.document || shouldKeepNativeFocusShortcut(event.target)) return;
+  event.preventDefault();
+  void focusMode.toggle();
+}
+
 function handleOriginalDocumentShortcut(event: KeyboardEvent): void {
   const action = originalDocumentShortcutAction(event);
   if (!session.snapshot.document || !action) return;
@@ -346,6 +379,13 @@ function shouldKeepNativeReadingNavigation(target: EventTarget | null): boolean 
 }
 
 function shouldKeepNativePageHistoryShortcut(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element &&
+      target.closest('input, textarea, select, [contenteditable="true"]'),
+  );
+}
+
+function shouldKeepNativeFocusShortcut(target: EventTarget | null): boolean {
   return Boolean(
     target instanceof Element &&
       target.closest('input, textarea, select, [contenteditable="true"]'),
@@ -416,6 +456,7 @@ async function openBytes(
   documentSidebar.destroy();
   setSidebarOpen(false);
   sidebarToggle.disabled = true;
+  focusMode.setAvailable(false);
   downloadOriginalButton.disabled = true;
   printOriginalButton.disabled = true;
   slots.clear();
@@ -456,6 +497,7 @@ async function openBytes(
   toolbar.show(pdfDocument.numPages);
   scheduleTopbarCollapse();
   sidebarToggle.disabled = false;
+  focusMode.setAvailable(true);
   searchButton.disabled = false;
   downloadOriginalButton.disabled = false;
   printOriginalButton.disabled = false;

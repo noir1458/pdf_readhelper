@@ -9,6 +9,7 @@ export type ReadingNavigationAction =
   "viewport-forward" | "viewport-backward" | "document-start" | "document-end";
 
 export type OriginalDocumentShortcutAction = "download-original" | "print-original";
+export type FocusModeShortcutAction = "toggle" | "exit";
 
 export function isPageCopyShortcut(event: CopyShortcutEvent): boolean {
   return (
@@ -71,4 +72,22 @@ export function originalDocumentShortcutAction(
   if (event.key.toLowerCase() === "s") return "download-original";
   if (event.key.toLowerCase() === "p") return "print-original";
   return null;
+}
+
+export function focusModeShortcutAction(
+  event: CopyShortcutEvent,
+  active: boolean,
+): FocusModeShortcutAction | null {
+  if (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  ) {
+    return null;
+  }
+  if (active && event.key === "Escape") return "exit";
+  return event.key.toLowerCase() === "f" ? "toggle" : null;
 }

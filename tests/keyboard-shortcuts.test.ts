@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  focusModeShortcutAction,
   isPageCopyShortcut,
   originalDocumentShortcutAction,
   readingNavigationAction,
@@ -77,6 +78,24 @@ describe("original document shortcuts", () => {
     ).toBeNull();
     expect(
       originalDocumentShortcutAction(event({ key: "p", ctrlKey: true, defaultPrevented: true })),
+    ).toBeNull();
+  });
+});
+
+describe("focus mode shortcut", () => {
+  it("toggles with an unmodified F key and exits with Escape while active", () => {
+    expect(focusModeShortcutAction(event({ key: "f" }), false)).toBe("toggle");
+    expect(focusModeShortcutAction(event({ key: "F" }), false)).toBe("toggle");
+    expect(focusModeShortcutAction(event({ key: "Escape" }), true)).toBe("exit");
+    expect(focusModeShortcutAction(event({ key: "Escape" }), false)).toBeNull();
+  });
+
+  it("preserves modified, repeated, and already handled keys", () => {
+    expect(focusModeShortcutAction(event({ key: "f", ctrlKey: true }), false)).toBeNull();
+    expect(focusModeShortcutAction(event({ key: "f", shiftKey: true }), false)).toBeNull();
+    expect(focusModeShortcutAction(event({ key: "f", repeat: true }), false)).toBeNull();
+    expect(
+      focusModeShortcutAction(event({ key: "f", defaultPrevented: true }), false),
     ).toBeNull();
   });
 });
