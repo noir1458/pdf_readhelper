@@ -228,6 +228,9 @@ button:disabled {
 .viewer-controls .icon-button {
   padding: 0 7px;
 }
+.history-button:disabled {
+  cursor: default;
+}
 .theme-launcher {
   position: relative;
   flex: 0 0 auto;

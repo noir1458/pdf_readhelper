@@ -24,6 +24,11 @@ import {
 } from "./keyboard-shortcuts";
 import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
+  PageNavigationHistory,
+  pageHistoryShortcutDirection,
+  type PageHistoryDirection,
+} from "./page-navigation-history";
+import {
   extractBookmarkTitle,
   normalizeBookmarkNote,
   normalizeBookmarkTitle,
@@ -86,11 +91,14 @@ const searchNext = requireElement<HTMLButtonElement>("#search-next");
 const downloadOriginalButton = requireElement<HTMLButtonElement>("#download-original");
 const printOriginalButton = requireElement<HTMLButtonElement>("#print-original");
 const bookmarkButton = requireElement<HTMLButtonElement>("#toggle-bookmark");
+const historyBackButton = requireElement<HTMLButtonElement>("#history-back");
+const historyForwardButton = requireElement<HTMLButtonElement>("#history-forward");
 const toast = new Toast(requireElement<HTMLElement>("#toast"));
 const tracker = new PageTracker(scroller, updateCurrentPage);
 const documentLibrary = new DocumentLibrary();
 const translationCache = new TranslationCache();
 const bookmarkStore = new PageBookmarkStore();
+const pageNavigationHistory = new PageNavigationHistory();
 const slots = new Map<number, PageSlot>();
 let renderer: PageRenderer | null = null;
 let renderObserver: IntersectionObserver | null = null;
@@ -184,6 +192,8 @@ requireElement<HTMLButtonElement>("#fit-height").addEventListener(
 );
 rotateButton.addEventListener("click", rotateClockwise);
 pageLayoutButton.addEventListener("click", togglePageLayout);
+historyBackButton.addEventListener("click", () => navigatePageHistory("back"));
+historyForwardButton.addEventListener("click", () => navigatePageHistory("forward"));
 sidebarToggle.addEventListener("click", () => setSidebarOpen(sidebar.hasAttribute("hidden")));
 pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
@@ -206,6 +216,7 @@ searchInput.addEventListener("keydown", (event) => {
 document.addEventListener("keydown", handlePageCopyShortcut);
 document.addEventListener("keydown", handlePdfSearchShortcut);
 document.addEventListener("keydown", handleReadingNavigationShortcut);
+document.addEventListener("keydown", handlePageHistoryShortcut);
 document.addEventListener("keydown", handleOriginalDocumentShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
@@ -288,6 +299,20 @@ function handleReadingNavigationShortcut(event: KeyboardEvent): void {
   navigateToPage(action === "document-start" ? 1 : session.snapshot.totalPages);
 }
 
+function handlePageHistoryShortcut(event: KeyboardEvent): void {
+  const direction = pageHistoryShortcutDirection(event);
+  if (
+    !session.snapshot.document ||
+    !direction ||
+    shouldKeepNativePageHistoryShortcut(event.target) ||
+    !canNavigatePageHistory(direction)
+  ) {
+    return;
+  }
+  event.preventDefault();
+  navigatePageHistory(direction);
+}
+
 function handleOriginalDocumentShortcut(event: KeyboardEvent): void {
   const action = originalDocumentShortcutAction(event);
   if (!session.snapshot.document || !action) return;
@@ -318,6 +343,13 @@ function shouldKeepNativeReadingNavigation(target: EventTarget | null): boolean 
   }
   const selection = window.getSelection();
   return Boolean(selection && !selection.isCollapsed && selection.toString());
+}
+
+function shouldKeepNativePageHistoryShortcut(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element &&
+      target.closest('input, textarea, select, [contenteditable="true"]'),
+  );
 }
 
 async function currentTabId(): Promise<number | undefined> {
@@ -372,6 +404,8 @@ async function openBytes(
   translationRequestController = null;
   resetSearch();
   resetBookmarks();
+  pageNavigationHistory.clear();
+  updatePageHistoryButtons();
   flushReadingPosition();
   activeDocumentId = null;
   const previousRenderer = renderer;
@@ -415,6 +449,8 @@ async function openBytes(
   pageInput.max = String(pdfDocument.numPages);
   updateCurrentPage(1);
   activeDocumentId = libraryId;
+  pageNavigationHistory.reset(initialPage);
+  updatePageHistoryButtons();
   documentSidebar.setActiveDocument(libraryId);
   if (translationPanel.isOpen) void loadCachedTranslation(initialPage);
   toolbar.show(pdfDocument.numPages);
@@ -430,7 +466,7 @@ async function openBytes(
   emptyState.hidden = true;
   document.title =
     source.kind === "local-file" ? `${source.name} — PDF Read Helper` : "PDF Read Helper";
-  if (initialPage > 1) navigateToPage(initialPage, "auto");
+  if (initialPage > 1) navigateToPage(initialPage, "auto", false);
   await renderNear(initialPage);
   if (options.persistBytes === false) {
     void saveReadingPositionNow().then(refreshDocumentLibrary).catch(reportLibraryError);
@@ -523,13 +559,40 @@ function navigateFromInput(): void {
   }
 }
 
-function navigateToPage(target: number, behavior: ScrollBehavior = "smooth"): boolean {
+function navigateToPage(
+  target: number,
+  behavior: ScrollBehavior = "smooth",
+  recordHistory = true,
+): boolean {
   const slot = slots.get(target);
   if (!Number.isInteger(target) || !slot) return false;
+  if (recordHistory) {
+    pageNavigationHistory.record(session.snapshot.currentPage, target);
+    updatePageHistoryButtons();
+  }
   slot.element.scrollIntoView({ behavior, block: "start" });
   updateCurrentPage(target);
   void renderNear(target);
   return true;
+}
+
+function navigatePageHistory(direction: PageHistoryDirection): void {
+  const target = pageNavigationHistory.move(direction, session.snapshot.currentPage);
+  if (target === null) return;
+  navigateToPage(target, "auto", false);
+  updatePageHistoryButtons();
+}
+
+function canNavigatePageHistory(direction: PageHistoryDirection): boolean {
+  return direction === "back"
+    ? pageNavigationHistory.canGoBack
+    : pageNavigationHistory.canGoForward;
+}
+
+function updatePageHistoryButtons(): void {
+  const hasDocument = Boolean(session.snapshot.document);
+  historyBackButton.disabled = !hasDocument || !pageNavigationHistory.canGoBack;
+  historyForwardButton.disabled = !hasDocument || !pageNavigationHistory.canGoForward;
 }
 
 async function activatePdfLink(target: PdfLinkTarget): Promise<void> {
