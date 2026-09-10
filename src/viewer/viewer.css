@@ -72,6 +72,7 @@ input:focus-visible {
 .topbar .brand,
 .topbar #open-file,
 .topbar .url-launcher,
+.topbar .toolbar-overflow,
 .topbar .theme-launcher,
 .topbar .search-launcher,
 .topbar .viewer-controls > button {
@@ -84,6 +85,7 @@ input:focus-visible {
 .topbar.is-compact .brand,
 .topbar.is-compact #open-file,
 .topbar.is-compact .url-launcher,
+.topbar.is-compact .toolbar-overflow,
 .topbar.is-compact .theme-launcher,
 .topbar.is-compact .search-launcher,
 .topbar.is-compact .viewer-controls > button {
@@ -239,6 +241,68 @@ button:disabled {
 }
 .viewer-controls .icon-button {
   padding: 0 7px;
+}
+.toolbar-overflow {
+  position: relative;
+  flex: 0 0 auto;
+}
+#toolbar-more {
+  min-width: 40px;
+}
+#toolbar-more circle {
+  fill: currentColor;
+  stroke: none;
+}
+#toolbar-more[aria-expanded="true"] {
+  border-color: rgba(112, 214, 177, 0.55);
+  background: rgba(112, 214, 177, 0.12);
+}
+.toolbar-overflow-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 31;
+  width: min(294px, calc(100vw - 24px));
+  max-height: calc(100vh - var(--bar-height) - 20px);
+  padding: 10px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #202329;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+.toolbar-overflow-menu > button,
+.toolbar-overflow-menu > .theme-launcher,
+.toolbar-overflow-menu > .search-launcher,
+.toolbar-overflow-menu > .theme-launcher > button,
+.toolbar-overflow-menu > .search-launcher > button {
+  width: 100%;
+  min-width: 0;
+}
+.toolbar-overflow-menu .overflow-tool {
+  min-height: 62px;
+  padding: 7px 4px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  color: #eef1f4;
+}
+.toolbar-overflow-menu .overflow-label {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.toolbar-overflow-menu .theme-popover,
+.toolbar-overflow-menu .search-popover {
+  position: fixed;
+  top: calc(var(--bar-height) + 8px);
+  right: 16px;
 }
 .history-button:disabled {
   cursor: default;

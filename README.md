@@ -88,11 +88,12 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The right control group is ordered as zoom out, zoom in, fit height, fit width, rotate clockwise, page layout, page flow, previous/next view, focus mode, reading theme, bookmark, search, original download, original print, IMG, PDF, AI, and current/total page. Page actions and the page number therefore remain adjacent.
+- The compact right control group keeps zoom out, zoom in, fit height, fit width, More, IMG, PDF, AI, and current/total page directly adjacent. More opens a labeled grid containing rotation, page layout/flow, previous/next view, focus mode, reading theme, bookmark, search, original download, and original print, so narrow windows do not overflow with one button per feature.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
+- Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, and print controls. It closes after a direct action, with Escape, or when clicking elsewhere. Ctrl/Command+F opens More and its search field automatically.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
 - Use the page-and-arrow button to switch between continuous scrolling and page-turn mode. Page-turn mode shows only the current page or cover-first spread, adds translucent previous/next buttons at the viewer edges, and supports Left/Right Arrow, Space, Shift+Space, Page Up, and Page Down. The selected flow persists locally across viewer tabs and browser restarts.
@@ -103,8 +104,8 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Download or print the original PDF
 
-- Use the down-arrow button or ⌘S/Ctrl+S to save the unchanged source PDF with a safe filename.
-- Use the printer button or ⌘P/Ctrl+P to print the unchanged source PDF. The extension first asks Chrome's PDF frame to open its print dialog. If Chrome blocks framed PDF printing, it opens the original PDF in the native viewer so its print button can be used.
+- Use **More → Download** or ⌘S/Ctrl+S to save the unchanged source PDF with a safe filename.
+- Use **More → Print** or ⌘P/Ctrl+P to print the unchanged source PDF. The extension first asks Chrome's PDF frame to open its print dialog. If Chrome blocks framed PDF printing, it opens the original PDF in the native viewer so its print button can be used.
 
 Both actions reuse the already loaded bytes. They do not render hundreds of page canvases, apply the viewer's rotation, or alter the source file.
 
@@ -252,6 +253,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
+- [ ] Open More, use a direct action, Escape, and outside click; verify it closes correctly and that theme/search sub-popovers remain usable
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
 - [ ] Copy and explicitly retranslate a rotated page; verify the generated image follows the displayed orientation while PDF Range remains original
 - [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and clicking the right sheet updates the page counter

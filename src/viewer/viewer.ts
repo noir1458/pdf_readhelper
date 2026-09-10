@@ -11,6 +11,7 @@ import { TranslationCache, type CachedPageTranslation } from "../translation/tra
 import { DocumentToolbar } from "../ui/document-toolbar";
 import { FocusMode } from "../ui/focus-mode";
 import { ReadingThemePicker } from "../ui/reading-theme-picker";
+import { ToolbarOverflow } from "../ui/toolbar-overflow";
 import { TranslationPanel } from "../ui/translation-panel";
 import { Toast } from "../ui/toast";
 import { UrlPopover } from "../ui/url-popover";
@@ -184,11 +185,19 @@ const focusMode = new FocusMode(document.body, focusModeButton, {
 
 applyPageFlow();
 
-new ReadingThemePicker(
+const readingThemePicker = new ReadingThemePicker(
   requireElement<HTMLElement>("#theme-popover"),
   requireElement<HTMLButtonElement>("#reading-theme"),
   (theme) => {
     scroller.dataset.readingTheme = theme;
+  },
+);
+
+const toolbarOverflow = new ToolbarOverflow(
+  requireElement<HTMLElement>("#toolbar-overflow"),
+  () => {
+    readingThemePicker.close();
+    if (!searchPopover.hidden) closeSearch();
   },
 );
 
@@ -327,10 +336,7 @@ function handleReadingNavigationShortcut(event: KeyboardEvent): void {
   }
 
   event.preventDefault();
-  if (
-    pageFlow === "paged" &&
-    (action === "viewport-forward" || action === "viewport-backward")
-  ) {
+  if (pageFlow === "paged" && (action === "viewport-forward" || action === "viewport-backward")) {
     turnPage(action === "viewport-forward" ? "next" : "previous");
     return;
   }
@@ -418,14 +424,14 @@ function shouldKeepNativeReadingNavigation(target: EventTarget | null): boolean 
 function shouldKeepNativePageHistoryShortcut(target: EventTarget | null): boolean {
   return Boolean(
     target instanceof Element &&
-      target.closest('input, textarea, select, [contenteditable="true"]'),
+    target.closest('input, textarea, select, [contenteditable="true"]'),
   );
 }
 
 function shouldKeepNativeFocusShortcut(target: EventTarget | null): boolean {
   return Boolean(
     target instanceof Element &&
-      target.closest('input, textarea, select, [contenteditable="true"]'),
+    target.closest('input, textarea, select, [contenteditable="true"]'),
   );
 }
 
@@ -709,6 +715,7 @@ function toggleSearch(): void {
 function openSearch(): void {
   if (!documentSearch) return;
   showFullTopbar();
+  toolbarOverflow.open();
   searchPopover.hidden = false;
   searchButton.setAttribute("aria-expanded", "true");
   window.requestAnimationFrame(() => {
@@ -1232,7 +1239,12 @@ function scheduleTopbarCollapse(): void {
   window.clearTimeout(topbarCollapseTimer);
   if (!session.snapshot.document) return;
   topbarCollapseTimer = window.setTimeout(() => {
-    if (topbar.matches(":hover") || topbar.querySelector(":focus-visible") || !searchPopover.hidden)
+    if (
+      topbar.matches(":hover") ||
+      topbar.querySelector(":focus-visible") ||
+      !searchPopover.hidden ||
+      toolbarOverflow.isOpen
+    )
       return;
     topbar.classList.add("is-compact");
   }, 450);
