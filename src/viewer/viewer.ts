@@ -25,6 +25,8 @@ import {
 import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
   extractBookmarkTitle,
+  normalizeBookmarkNote,
+  normalizeBookmarkTitle,
   pageBookmarkKey,
   PageBookmarkStore,
   sortPageBookmarks,
@@ -126,6 +128,7 @@ const documentSidebar = new DocumentSidebar(
     openDocument: openSavedDocument,
     removeDocument: removeSavedDocument,
     reorderDocuments: reorderSavedDocuments,
+    editBookmark,
     removeBookmark,
     reportError: (message) => toast.show(message, "error"),
   },
@@ -753,6 +756,29 @@ async function removeBookmark(pageNumber: number): Promise<void> {
   renderBookmarks();
   updateBookmarkButton();
   toast.show(`Removed bookmark for page ${pageNumber}`, "success");
+}
+
+async function editBookmark(pageNumber: number, title: string, note: string): Promise<void> {
+  const documentId = activeDocumentId;
+  const existing = currentBookmarks.get(pageNumber);
+  if (!documentId || existing?.documentId !== documentId) {
+    throw new UserFacingError("That bookmark is no longer available.");
+  }
+
+  const normalizedNote = normalizeBookmarkNote(note);
+  const bookmark: PageBookmark = {
+    ...existing,
+    title: normalizeBookmarkTitle(title, pageNumber),
+    updatedAt: Date.now(),
+  };
+  if (normalizedNote) bookmark.note = normalizedNote;
+  else delete bookmark.note;
+
+  await bookmarkStore.put(bookmark);
+  if (activeDocumentId !== documentId) return;
+  currentBookmarks.set(pageNumber, bookmark);
+  renderBookmarks();
+  toast.show(`Saved bookmark for page ${pageNumber}`, "success");
 }
 
 function renderBookmarks(): void {

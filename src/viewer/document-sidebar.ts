@@ -2,7 +2,11 @@ import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { canvasDimensions, limitedScale } from "./render-math";
 import type { SavedDocumentSummary } from "./document-library";
 import { destinationPageNumber } from "./pdf-destination";
-import type { PageBookmark } from "./page-bookmarks";
+import {
+  MAX_BOOKMARK_NOTE_LENGTH,
+  MAX_BOOKMARK_TITLE_LENGTH,
+  type PageBookmark,
+} from "./page-bookmarks";
 
 type OutlineItem = {
   title: string;
@@ -32,6 +36,7 @@ type SidebarOptions = {
   openDocument: (id: string) => Promise<void>;
   removeDocument: (id: string) => Promise<void>;
   reorderDocuments: (ids: string[]) => Promise<void>;
+  editBookmark: (pageNumber: number, title: string, note: string) => Promise<void>;
   removeBookmark: (pageNumber: number) => Promise<void>;
   reportError: (message: string) => void;
 };
@@ -46,6 +51,7 @@ export class DocumentSidebar {
   readonly #openDocument: SidebarOptions["openDocument"];
   readonly #removeDocument: SidebarOptions["removeDocument"];
   readonly #reorderDocuments: SidebarOptions["reorderDocuments"];
+  readonly #editBookmark: SidebarOptions["editBookmark"];
   readonly #removeBookmark: SidebarOptions["removeBookmark"];
   readonly #thumbnailButtons = new Map<number, HTMLButtonElement>();
   readonly #documentButtons = new Map<string, HTMLButtonElement>();
@@ -56,6 +62,7 @@ export class DocumentSidebar {
   #document: PDFDocumentProxy | null = null;
   #thumbnailObserver: IntersectionObserver | null = null;
   #currentPage = 1;
+  #bookmarks: PageBookmark[] = [];
   #draggedDocumentId: string | null = null;
 
   constructor(elements: SidebarElements, options: SidebarOptions) {
@@ -64,6 +71,7 @@ export class DocumentSidebar {
     this.#openDocument = options.openDocument;
     this.#removeDocument = options.removeDocument;
     this.#reorderDocuments = options.reorderDocuments;
+    this.#editBookmark = options.editBookmark;
     this.#removeBookmark = options.removeBookmark;
     this.#reportError = options.reportError;
     elements.thumbnailsTab.addEventListener("click", () => this.showPanel("thumbnails"));
@@ -199,6 +207,7 @@ export class DocumentSidebar {
   }
 
   setBookmarks(bookmarks: PageBookmark[]): void {
+    this.#bookmarks = [...bookmarks];
     this.#bookmarkButtons.clear();
     this.#elements.bookmarksList.replaceChildren();
     if (bookmarks.length === 0) {
@@ -210,6 +219,7 @@ export class DocumentSidebar {
     for (const bookmark of bookmarks) {
       const row = document.createElement("article");
       row.className = "page-bookmark";
+      row.dataset.pageNumber = String(bookmark.pageNumber);
 
       const openButton = document.createElement("button");
       openButton.className = "page-bookmark-open";
@@ -226,8 +236,26 @@ export class DocumentSidebar {
       const page = document.createElement("span");
       page.className = "page-bookmark-page";
       page.textContent = `Page ${bookmark.pageNumber}`;
-      openButton.append(title, page);
+      openButton.append(title);
+      if (bookmark.note) {
+        const note = document.createElement("span");
+        note.className = "page-bookmark-note";
+        note.textContent = bookmark.note;
+        openButton.append(note);
+      }
+      openButton.append(page);
       openButton.addEventListener("click", () => this.#navigate(bookmark.pageNumber));
+
+      const actions = document.createElement("span");
+      actions.className = "page-bookmark-actions";
+
+      const editButton = document.createElement("button");
+      editButton.className = "page-bookmark-edit";
+      editButton.type = "button";
+      editButton.textContent = "✎";
+      editButton.title = `Edit page ${bookmark.pageNumber} bookmark`;
+      editButton.setAttribute("aria-label", `Edit bookmark for page ${bookmark.pageNumber}`);
+      editButton.addEventListener("click", () => this.#showBookmarkEditor(row, bookmark));
 
       const removeButton = document.createElement("button");
       removeButton.className = "page-bookmark-remove";
@@ -239,7 +267,8 @@ export class DocumentSidebar {
         void this.#runBookmarkAction(removeButton, bookmark.pageNumber);
       });
 
-      row.append(openButton, removeButton);
+      actions.append(editButton, removeButton);
+      row.append(openButton, actions);
       this.#bookmarkButtons.set(bookmark.pageNumber, openButton);
       fragment.append(row);
     }
@@ -284,6 +313,7 @@ export class DocumentSidebar {
     this.#requestedThumbnails.clear();
     this.#thumbnailButtons.clear();
     this.#bookmarkButtons.clear();
+    this.#bookmarks = [];
     this.#elements.thumbnailsList.replaceChildren();
     this.#elements.outlineList.replaceChildren();
     this.#elements.bookmarksList.replaceChildren(this.#status("Open a PDF to view its bookmarks."));
@@ -558,6 +588,89 @@ export class DocumentSidebar {
     } finally {
       button.disabled = false;
     }
+  }
+
+  #showBookmarkEditor(row: HTMLElement, bookmark: PageBookmark): void {
+    const form = document.createElement("form");
+    form.className = "page-bookmark-editor";
+
+    const titleLabel = document.createElement("label");
+    titleLabel.textContent = "Title";
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.value = bookmark.title;
+    titleInput.maxLength = MAX_BOOKMARK_TITLE_LENGTH;
+    titleInput.setAttribute("aria-label", `Bookmark title for page ${bookmark.pageNumber}`);
+    titleLabel.append(titleInput);
+
+    const noteLabel = document.createElement("label");
+    noteLabel.textContent = "Note";
+    const noteInput = document.createElement("input");
+    noteInput.type = "text";
+    noteInput.value = bookmark.note ?? "";
+    noteInput.maxLength = MAX_BOOKMARK_NOTE_LENGTH;
+    noteInput.placeholder = "Optional note";
+    noteInput.setAttribute("aria-label", `Bookmark note for page ${bookmark.pageNumber}`);
+    noteLabel.append(noteInput);
+
+    const actions = document.createElement("span");
+    actions.className = "page-bookmark-editor-actions";
+    const saveButton = document.createElement("button");
+    saveButton.type = "submit";
+    saveButton.textContent = "Save";
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = "Cancel";
+    cancelButton.addEventListener("click", () => this.#cancelBookmarkEdit(bookmark.pageNumber));
+    actions.append(saveButton, cancelButton);
+    form.append(titleLabel, noteLabel, actions);
+
+    form.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      this.#cancelBookmarkEdit(bookmark.pageNumber);
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void this.#runBookmarkEdit(form, bookmark.pageNumber, titleInput.value, noteInput.value);
+    });
+
+    row.classList.add("is-editing");
+    row.replaceChildren(form);
+    titleInput.focus();
+    titleInput.select();
+  }
+
+  async #runBookmarkEdit(
+    form: HTMLFormElement,
+    pageNumber: number,
+    title: string,
+    note: string,
+  ): Promise<void> {
+    for (const control of form.elements) {
+      if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+        control.disabled = true;
+      }
+    }
+    try {
+      await this.#editBookmark(pageNumber, title, note);
+    } catch {
+      this.#reportError("Could not save the bookmark note.");
+      for (const control of form.elements) {
+        if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+          control.disabled = false;
+        }
+      }
+    }
+  }
+
+  #cancelBookmarkEdit(pageNumber: number): void {
+    this.setBookmarks(this.#bookmarks);
+    this.#elements.bookmarksList
+      .querySelector<HTMLButtonElement>(
+        `.page-bookmark[data-page-number="${pageNumber}"] .page-bookmark-edit`,
+      )
+      ?.focus();
   }
 }
 

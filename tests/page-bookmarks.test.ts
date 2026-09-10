@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   bookmarkTitleFromText,
+  MAX_BOOKMARK_NOTE_LENGTH,
+  MAX_BOOKMARK_TITLE_LENGTH,
+  normalizeBookmarkNote,
+  normalizeBookmarkTitle,
   pageBookmarkKey,
   sortPageBookmarks,
   type PageBookmark,
@@ -45,5 +49,21 @@ describe("page bookmarks", () => {
     const title = bookmarkTitleFromText({ items: [{ str: "A".repeat(140) }] }, 3);
     expect(title).toHaveLength(90);
     expect(title.endsWith("…")).toBe(true);
+  });
+
+  it("normalizes edited titles and restores the page fallback when blank", () => {
+    expect(normalizeBookmarkTitle("  Process   State  ", 54)).toBe("Process State");
+    expect(normalizeBookmarkTitle("   ", 54)).toBe("Page 54");
+    expect(normalizeBookmarkTitle("A".repeat(140), 54)).toHaveLength(
+      MAX_BOOKMARK_TITLE_LENGTH,
+    );
+  });
+
+  it("normalizes optional notes and enforces their storage limit", () => {
+    expect(normalizeBookmarkNote("  revisit   after chapter 4 ")).toBe(
+      "revisit after chapter 4",
+    );
+    expect(normalizeBookmarkNote("   ")).toBeUndefined();
+    expect(normalizeBookmarkNote("A".repeat(400))).toHaveLength(MAX_BOOKMARK_NOTE_LENGTH);
   });
 });

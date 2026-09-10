@@ -5,7 +5,9 @@ export type PageBookmark = {
   documentId: string;
   pageNumber: number;
   title: string;
+  note?: string;
   createdAt: number;
+  updatedAt?: number;
 };
 
 type BookmarkTextContent = {
@@ -16,7 +18,8 @@ const DATABASE_NAME = "pdf-read-helper-bookmarks";
 const DATABASE_VERSION = 1;
 const BOOKMARK_STORE = "bookmarks";
 const DOCUMENT_INDEX = "documentId";
-const MAX_BOOKMARK_TITLE_LENGTH = 90;
+export const MAX_BOOKMARK_TITLE_LENGTH = 90;
+export const MAX_BOOKMARK_NOTE_LENGTH = 240;
 
 export class PageBookmarkStore {
   #databasePromise: Promise<IDBDatabase> | null = null;
@@ -95,9 +98,20 @@ export function bookmarkTitleFromText(content: BookmarkTextContent, pageNumber: 
     const text = item.str.trim().replace(/\s+/g, " ");
     if (!text || /^\d{1,4}$/.test(text) || /^page\s+\d+$/i.test(text)) continue;
     if (text.length < 4) continue;
-    return truncateBookmarkTitle(text);
+    return normalizeBookmarkTitle(text, pageNumber);
   }
   return `Page ${pageNumber}`;
+}
+
+export function normalizeBookmarkTitle(value: string, pageNumber: number): string {
+  const title = value.trim().replace(/\s+/g, " ");
+  return title ? truncateBookmarkTitle(title) : `Page ${pageNumber}`;
+}
+
+export function normalizeBookmarkNote(value: string): string | undefined {
+  const note = value.trim().replace(/\s+/g, " ");
+  if (!note) return undefined;
+  return note.slice(0, MAX_BOOKMARK_NOTE_LENGTH).trimEnd();
 }
 
 export async function extractBookmarkTitle(

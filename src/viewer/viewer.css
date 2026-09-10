@@ -910,6 +910,7 @@ button:disabled {
   text-align: left;
 }
 .page-bookmark-open:hover,
+.page-bookmark-edit:hover,
 .page-bookmark-remove:hover {
   background: rgba(255, 255, 255, 0.06);
 }
@@ -927,15 +928,85 @@ button:disabled {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+.page-bookmark-note {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #c5cbd4;
+  font-size: 10px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.page-bookmark-actions {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+}
+.page-bookmark-edit,
 .page-bookmark-remove {
   width: 28px;
-  min-height: 32px;
+  min-height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 0 8px 8px 0;
   background: transparent;
   color: var(--muted);
+}
+.page-bookmark-edit {
+  border-radius: 0 8px 0 0;
+  font-size: 14px;
+}
+.page-bookmark-remove {
+  border-radius: 0 0 8px 0;
   font-size: 17px;
+}
+.page-bookmark.is-editing {
+  display: block;
+  padding: 10px;
+  border-color: rgba(112, 214, 177, 0.4);
+  background: rgba(112, 214, 177, 0.06);
+  overflow: visible;
+}
+.page-bookmark-editor {
+  display: grid;
+  gap: 9px;
+}
+.page-bookmark-editor label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+.page-bookmark-editor input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #111419;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+.page-bookmark-editor input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid rgba(112, 214, 177, 0.22);
+}
+.page-bookmark-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.page-bookmark-editor-actions button {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--button);
+  color: var(--text);
+  font-size: 10px;
+}
+.page-bookmark-editor-actions button[type="submit"] {
+  border-color: rgba(112, 214, 177, 0.5);
+  color: var(--accent);
 }
 .saved-document {
   position: relative;

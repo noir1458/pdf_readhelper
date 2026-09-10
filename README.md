@@ -25,7 +25,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
 - Local saved-document shelf with cover thumbnails, filenames, last-read pages, and persistent drag reordering
 - Per-document page restoration across viewer and browser restarts
-- Persistent per-PDF page bookmarks with local automatic titles and sidebar navigation
+- Persistent per-PDF page bookmarks with editable local titles, short notes, and sidebar navigation
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
 - Local pixel-based margin detection, safe content cropping, and 70% output resampling
 - PNG clipboard write with automatic download fallback
@@ -114,9 +114,9 @@ Both actions reuse the already loaded bytes. They do not render hundreds of page
 ### Page bookmarks
 
 - Click the ribbon button to add or remove a bookmark for the current page. Its pressed state shows whether the page is bookmarked.
-- Open the fourth sidebar tab to see the current PDF's bookmarks, sorted by page number. Select one to navigate or use its `×` button to remove it.
+- Open the fourth sidebar tab to see the current PDF's bookmarks, sorted by page number. Select one to navigate, use `✎` to edit its title or add a short note, or use `×` to remove it. Enter saves the inline editor; Escape or Cancel closes it without changes.
 - A short title is taken locally from the page's first meaningful embedded text. Textless/scanned pages use `Page N`; no AI or network request is involved.
-- Bookmarks persist by PDF fingerprint. Removing a PDF from the saved-document shelf also removes its local bookmarks.
+- Bookmark titles and notes persist locally by PDF fingerprint. Removing a PDF from the saved-document shelf also removes its local bookmarks.
 
 ### Copy current page
 
@@ -236,7 +236,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Open a 100+ page document and inspect that distant canvases are released
 - [ ] Switch between thumbnails and table of contents; navigate with both
 - [ ] Switch between two saved PDFs, drag them into a new order, and verify the cover/title list, persistent order, and restored page
-- [ ] Bookmark text and scanned pages, switch PDFs/reload Chrome, and verify automatic titles, navigation, pressed state, persistence, and removal
+- [ ] Bookmark text and scanned pages, edit a title/note with Enter and cancel with Escape, switch PDFs/reload Chrome, and verify navigation, pressed state, persistence, and removal
 - [ ] Reload Chrome and verify that saved documents and last-read pages remain available
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
