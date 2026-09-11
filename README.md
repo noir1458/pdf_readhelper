@@ -23,8 +23,8 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Original PDF download and print handoff without rerendering every page
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
 - Focus/fullscreen reading mode that temporarily hides all viewer chrome
-- Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
-- Hover-expanding sidebar rail that overlays the document instead of reducing its width
+- Edge-revealed left sidebar with lazy page thumbnails and PDF table-of-contents navigation
+- Full-width sidebar overlay that slides in from the left without reducing the document width
 - Local saved-document shelf with covers, last-read pages, per-document view state, and persistent drag reordering
 - Per-document page restoration across viewer and browser restarts
 - Persistent per-PDF page bookmarks with editable local titles, short notes, and sidebar navigation
@@ -90,7 +90,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 - The compact right control group keeps zoom out, zoom in, fit height, fit width, More, IMG, PDF, AI, and current/total page directly adjacent. More opens a labeled grid containing rotation, page layout/flow, previous/next view, focus mode, reading theme, bookmark, search, original download/print, and a keyboard-shortcut reference, so narrow windows do not overflow with one button per feature.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
-- Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused. Its controls always begin below the expanded-toolbar height, so revealing the top bar never shifts sidebar content vertically.
+- Move to the 14px strip along the left edge below the toolbar to reveal the document sidebar; move away to hide it again. Keyboard users can Tab to the invisible edge control to reveal it. Its controls always begin below the expanded-toolbar height, so revealing the top bar never shifts sidebar content vertically.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
 - Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, print, and shortcut-help controls. Choose **? Shortcuts** for an in-viewer reference of every supported key. The panels close with their × button, Escape, or a click elsewhere. Ctrl/Command+F opens More and its search field automatically.
@@ -266,8 +266,8 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Click an internal page link and an external web link; confirm the former navigates in the viewer and the latter opens a new tab
 - [ ] Download the original PDF with the toolbar and ⌘S/Ctrl+S; confirm its bytes/pages are unchanged and its filename is safe
 - [ ] Print with the toolbar and ⌘P/Ctrl+P; confirm either the PDF print dialog opens or the native PDF viewer opens at the current page as a fallback
-- [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls; confirm the expanded toolbar pushes sidebar content below it
-- [ ] Verify the left sidebar collapses to its icon rail and expands over—not beside—the PDF
+- [ ] Move away from the toolbar, verify compact mode, then touch the top edge to reveal all controls; confirm the sidebar content remains at its fixed vertical position
+- [ ] Touch the left-edge reveal strip and verify the full sidebar slides over—not beside—the PDF, stays open during document drag reordering, and hides after leaving
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears
 - [ ] Confirm normal white-page margins are cropped without cutting headers, footers, or page numbers
 - [ ] Confirm colored covers, blank pages, scanned pages, and dark pages use safe bounds

@@ -9,18 +9,6 @@
   </head>
   <body>
     <header class="topbar">
-      <button
-        id="toggle-sidebar"
-        class="icon-button sidebar-button"
-        type="button"
-        aria-label="Show sidebar"
-        title="Show sidebar"
-        aria-expanded="false"
-        aria-controls="document-sidebar"
-        disabled
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16" /></svg>
-      </button>
       <div class="brand">PDF Read Helper</div>
       <button id="open-file" class="primary" type="button">Open PDF</button>
       <input id="file-input" type="file" accept="application/pdf,.pdf" hidden />
@@ -510,6 +498,15 @@
       </nav>
     </header>
     <div id="topbar-reveal-zone" class="topbar-reveal-zone" aria-hidden="true"></div>
+    <button
+      id="sidebar-reveal-zone"
+      class="sidebar-reveal-zone"
+      type="button"
+      aria-label="Reveal document sidebar"
+      aria-expanded="false"
+      aria-controls="document-sidebar"
+      hidden
+    ></button>
 
     <div class="viewer-shell">
       <aside id="document-sidebar" class="document-sidebar" aria-label="Document navigation" hidden>

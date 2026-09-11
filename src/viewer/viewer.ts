@@ -94,7 +94,7 @@ const dropOverlay = requireElement<HTMLElement>("#drop-overlay");
 const topbar = requireElement<HTMLElement>(".topbar");
 const topbarRevealZone = requireElement<HTMLElement>("#topbar-reveal-zone");
 const sidebar = requireElement<HTMLElement>("#document-sidebar");
-const sidebarToggle = requireElement<HTMLButtonElement>("#toggle-sidebar");
+const sidebarRevealZone = requireElement<HTMLButtonElement>("#sidebar-reveal-zone");
 const rotateButton = requireElement<HTMLButtonElement>("#rotate-clockwise");
 const pageLayoutButton = requireElement<HTMLButtonElement>("#toggle-page-layout");
 const pageFlowButton = requireElement<HTMLButtonElement>("#toggle-page-flow");
@@ -127,6 +127,7 @@ let activeDocumentId: string | null = null;
 let positionSaveTimer = 0;
 let translationRequestController: AbortController | null = null;
 let topbarCollapseTimer = 0;
+let sidebarCollapseTimer = 0;
 let searchTimer = 0;
 let documentSearch: PdfDocumentSearch | null = null;
 let searchController: AbortController | null = null;
@@ -178,7 +179,8 @@ const translationPanel = new TranslationPanel(requireElement<HTMLElement>("#tran
 
 const focusMode = new FocusMode(document.body, focusModeButton, {
   changed: (active) => {
-    if (!active) showFullTopbar();
+    if (active) hideSidebar();
+    else showFullTopbar();
     toast.show(active ? "Focus mode · press F or Esc to exit" : "Focus mode off");
   },
   fullscreenFailed: () => {
@@ -245,7 +247,6 @@ previousPageButton.addEventListener("click", () => turnPage("previous"));
 nextPageButton.addEventListener("click", () => turnPage("next"));
 historyBackButton.addEventListener("click", () => navigatePageHistory("back"));
 historyForwardButton.addEventListener("click", () => navigatePageHistory("forward"));
-sidebarToggle.addEventListener("click", () => setSidebarOpen(sidebar.hasAttribute("hidden")));
 pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") navigateFromInput();
@@ -282,6 +283,19 @@ topbar.addEventListener("focusout", () => {
   });
 });
 topbarRevealZone.addEventListener("pointerenter", showFullTopbar);
+sidebarRevealZone.addEventListener("pointerenter", showSidebar);
+sidebarRevealZone.addEventListener("pointerleave", scheduleSidebarCollapse);
+sidebarRevealZone.addEventListener("focus", showSidebar);
+sidebarRevealZone.addEventListener("blur", () => {
+  window.requestAnimationFrame(scheduleSidebarCollapse);
+});
+sidebar.addEventListener("pointerenter", showSidebar);
+sidebar.addEventListener("pointerleave", scheduleSidebarCollapse);
+sidebar.addEventListener("focusin", showSidebar);
+sidebar.addEventListener("focusout", () => {
+  window.requestAnimationFrame(scheduleSidebarCollapse);
+});
+sidebar.addEventListener("dragend", scheduleSidebarCollapse);
 
 window.addEventListener("dragenter", handleDragEnter);
 window.addEventListener("dragover", handleDragOver);
@@ -506,8 +520,7 @@ async function openBytes(
   renderObserver?.disconnect();
   tracker.disconnect();
   documentSidebar.destroy();
-  setSidebarOpen(false);
-  sidebarToggle.disabled = true;
+  setSidebarAvailable(false);
   focusMode.setAvailable(false);
   pageFlowButton.disabled = true;
   pagedVisiblePages.clear();
@@ -554,7 +567,7 @@ async function openBytes(
   if (translationPanel.isOpen) void loadCachedTranslation(initialPage);
   toolbar.show(pdfDocument.numPages);
   scheduleTopbarCollapse();
-  sidebarToggle.disabled = false;
+  setSidebarAvailable(true);
   focusMode.setAvailable(true);
   pageFlowButton.disabled = false;
   searchButton.disabled = false;
@@ -562,7 +575,6 @@ async function openBytes(
   printOriginalButton.disabled = false;
   documentSidebar.showPanel(options.keepDocumentsPanel ? "documents" : "thumbnails");
   void documentSidebar.setDocument(pdfDocument);
-  setSidebarOpen(true);
   await loadBookmarks(libraryId);
   emptyState.hidden = true;
   document.title =
@@ -1072,9 +1084,9 @@ async function rememberDocument(
 async function refreshDocumentLibrary(): Promise<void> {
   const documents = await documentLibrary.list();
   documentSidebar.setDocuments(documents, activeDocumentId);
-  if (!session.snapshot.document && documents.length > 0) {
-    sidebarToggle.disabled = false;
-    documentSidebar.showPanel("documents");
+  if (!session.snapshot.document) {
+    setSidebarAvailable(documents.length > 0);
+    if (documents.length > 0) documentSidebar.showPanel("documents");
   }
 }
 
@@ -1305,12 +1317,51 @@ function updatePageStackLabel(): void {
   pageStack.setAttribute("aria-label", `PDF pages, ${layout}, ${flow}`);
 }
 
-function setSidebarOpen(open: boolean): void {
-  sidebar.hidden = !open;
-  sidebarToggle.setAttribute("aria-expanded", String(open));
-  sidebarToggle.setAttribute("aria-label", open ? "Hide sidebar" : "Show sidebar");
-  sidebarToggle.title = open ? "Hide sidebar" : "Show sidebar";
-  if (open) documentSidebar.revealCurrentPage();
+function setSidebarAvailable(available: boolean): void {
+  window.clearTimeout(sidebarCollapseTimer);
+  if (!available) {
+    hideSidebar();
+    sidebar.hidden = true;
+    sidebarRevealZone.hidden = true;
+    return;
+  }
+  if (!sidebar.hidden) return;
+  hideSidebar();
+  sidebar.hidden = false;
+  sidebarRevealZone.hidden = false;
+}
+
+function showSidebar(): void {
+  if (sidebar.hidden) return;
+  window.clearTimeout(sidebarCollapseTimer);
+  sidebar.inert = false;
+  sidebar.removeAttribute("aria-hidden");
+  sidebar.classList.add("is-revealed");
+  sidebarRevealZone.setAttribute("aria-expanded", "true");
+  documentSidebar.revealCurrentPage();
+}
+
+function scheduleSidebarCollapse(): void {
+  window.clearTimeout(sidebarCollapseTimer);
+  if (sidebar.hidden) return;
+  sidebarCollapseTimer = window.setTimeout(() => {
+    if (
+      sidebar.matches(":hover, :focus-within") ||
+      sidebarRevealZone.matches(":hover, :focus-visible") ||
+      sidebar.querySelector(".is-reordering")
+    ) {
+      return;
+    }
+    hideSidebar();
+  }, 450);
+}
+
+function hideSidebar(): void {
+  window.clearTimeout(sidebarCollapseTimer);
+  sidebar.classList.remove("is-revealed");
+  sidebar.inert = true;
+  sidebar.setAttribute("aria-hidden", "true");
+  sidebarRevealZone.setAttribute("aria-expanded", "false");
 }
 
 function scheduleTopbarCollapse(): void {
