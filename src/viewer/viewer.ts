@@ -10,6 +10,7 @@ import { OPENAI_TRANSLATION_MODEL, translatePageImage } from "../translation/ope
 import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
 import { DocumentToolbar } from "../ui/document-toolbar";
 import { FocusMode } from "../ui/focus-mode";
+import { KeyboardShortcutsPopover } from "../ui/keyboard-shortcuts-popover";
 import { ReadingThemePicker } from "../ui/reading-theme-picker";
 import { ToolbarOverflow } from "../ui/toolbar-overflow";
 import { TranslationPanel } from "../ui/translation-panel";
@@ -193,6 +194,12 @@ const readingThemePicker = new ReadingThemePicker(
   (theme) => {
     scroller.dataset.readingTheme = theme;
   },
+);
+
+new KeyboardShortcutsPopover(
+  requireElement<HTMLElement>("#keyboard-shortcuts-popover"),
+  requireElement<HTMLButtonElement>("#keyboard-shortcuts"),
+  requireElement<HTMLButtonElement>("#toolbar-more"),
 );
 
 const toolbarOverflow = new ToolbarOverflow(

@@ -298,11 +298,88 @@ button:disabled {
   line-height: 1.1;
   white-space: nowrap;
 }
+.shortcut-help-icon {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 24px;
+}
+.keyboard-shortcuts-popover {
+  position: fixed;
+  top: calc(var(--bar-height) + 8px);
+  right: 16px;
+  z-index: 32;
+  width: min(460px, calc(100vw - 24px));
+  max-height: calc(100vh - var(--bar-height) - 20px);
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #202329;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+.keyboard-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.keyboard-shortcuts-header h2 {
+  margin: 0;
+  color: #f5f7f8;
+  font-size: 15px;
+}
+.keyboard-shortcuts-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+.keyboard-shortcuts-list > div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.keyboard-shortcuts-list dt {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.keyboard-shortcuts-list dd {
+  margin: 6px 0 0;
+  color: #e7eaed;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.keyboard-shortcuts-list kbd {
+  min-width: 22px;
+  padding: 3px 6px;
+  border: 1px solid #555b66;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #2c3037;
+  color: #f3f5f7;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
 .toolbar-overflow-menu .theme-popover,
 .toolbar-overflow-menu .search-popover {
   position: fixed;
   top: calc(var(--bar-height) + 8px);
   right: 16px;
+}
+@media (max-width: 520px) {
+  .keyboard-shortcuts-list {
+    grid-template-columns: 1fr;
+  }
 }
 .history-button:disabled {
   cursor: default;

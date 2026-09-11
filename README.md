@@ -88,12 +88,12 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 
 ### Navigate and fit pages
 
-- The compact right control group keeps zoom out, zoom in, fit height, fit width, More, IMG, PDF, AI, and current/total page directly adjacent. More opens a labeled grid containing rotation, page layout/flow, previous/next view, focus mode, reading theme, bookmark, search, original download, and original print, so narrow windows do not overflow with one button per feature.
+- The compact right control group keeps zoom out, zoom in, fit height, fit width, More, IMG, PDF, AI, and current/total page directly adjacent. More opens a labeled grid containing rotation, page layout/flow, previous/next view, focus mode, reading theme, bookmark, search, original download/print, and a keyboard-shortcut reference, so narrow windows do not overflow with one button per feature.
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Use the top-left menu button to show or hide the document sidebar. When enabled, it rests as a 48px icon rail and expands over the PDF while hovered or keyboard-focused.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
 - Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
-- Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, and print controls. It closes after a direct action, with Escape, or when clicking elsewhere. Ctrl/Command+F opens More and its search field automatically.
+- Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, print, and shortcut-help controls. Choose **? Shortcuts** for an in-viewer reference of every supported key. The panels close with their × button, Escape, or a click elsewhere. Ctrl/Command+F opens More and its search field automatically.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
 - Use the page-and-arrow button to switch between continuous scrolling and page-turn mode. Page-turn mode shows only the current page or cover-first spread, adds translucent previous/next buttons at the viewer edges, and supports Left/Right Arrow, Space, Shift+Space, Page Up, and Page Down. The selected flow persists locally across viewer tabs and browser restarts.
@@ -254,6 +254,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
 - [ ] Open More, use a direct action, Escape, and outside click; verify it closes correctly and that theme/search sub-popovers remain usable
+- [ ] Open More → Shortcuts; verify the reference remains visible after More closes and closes with ×, Escape, and an outside click
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
 - [ ] Copy and explicitly retranslate a rotated page; verify the generated image follows the displayed orientation while PDF Range remains original
 - [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and clicking the right sheet updates the page counter

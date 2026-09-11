@@ -363,7 +363,90 @@
               </svg>
               <span class="overflow-label">Print</span>
             </button>
+            <button
+              id="keyboard-shortcuts"
+              class="icon-button overflow-tool"
+              type="button"
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="keyboard-shortcuts-popover"
+            >
+              <span class="shortcut-help-icon" aria-hidden="true">?</span>
+              <span class="overflow-label">Shortcuts</span>
+            </button>
           </div>
+          <section
+            id="keyboard-shortcuts-popover"
+            class="keyboard-shortcuts-popover"
+            role="dialog"
+            aria-labelledby="keyboard-shortcuts-title"
+            hidden
+          >
+            <header class="keyboard-shortcuts-header">
+              <h2 id="keyboard-shortcuts-title">Keyboard shortcuts</h2>
+              <button
+                id="close-keyboard-shortcuts"
+                class="close-button"
+                type="button"
+                aria-label="Close keyboard shortcuts"
+                title="Close"
+              >
+                ×
+              </button>
+            </header>
+            <dl class="keyboard-shortcuts-list">
+              <div>
+                <dt><kbd>⌘ / Ctrl</kbd><kbd>C</kbd></dt>
+                <dd>Copy current page as IMG</dd>
+              </div>
+              <div>
+                <dt><kbd>⌘ / Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></dt>
+                <dd>Copy page with the extension command</dd>
+              </div>
+              <div>
+                <dt><kbd>⌘ / Ctrl</kbd><kbd>F</kbd></dt>
+                <dd>Search PDF text</dd>
+              </div>
+              <div>
+                <dt><kbd>⌘ / Ctrl</kbd><kbd>S</kbd></dt>
+                <dd>Download original PDF</dd>
+              </div>
+              <div>
+                <dt><kbd>⌘ / Ctrl</kbd><kbd>P</kbd></dt>
+                <dd>Print original PDF</dd>
+              </div>
+              <div>
+                <dt><kbd>Space</kbd><span>/</span><kbd>Page ↓</kbd></dt>
+                <dd>Scroll or turn forward</dd>
+              </div>
+              <div>
+                <dt><kbd>Shift</kbd><kbd>Space</kbd><span>/</span><kbd>Page ↑</kbd></dt>
+                <dd>Scroll or turn backward</dd>
+              </div>
+              <div>
+                <dt><kbd>Home</kbd><span>/</span><kbd>End</kbd></dt>
+                <dd>First or last page</dd>
+              </div>
+              <div>
+                <dt><kbd>Alt</kbd><kbd>← / →</kbd></dt>
+                <dd>Previous or next jump</dd>
+              </div>
+              <div>
+                <dt><kbd>← / →</kbd></dt>
+                <dd>Turn page in page-turn mode</dd>
+              </div>
+              <div>
+                <dt><kbd>F</kbd></dt>
+                <dd>Toggle focus mode</dd>
+              </div>
+              <div>
+                <dt><kbd>Esc</kbd></dt>
+                <dd>Close a panel or exit focus mode</dd>
+              </div>
+            </dl>
+          </section>
         </div>
         <div id="document-toolbar" class="document-toolbar" aria-label="Page tools" hidden>
           <button
