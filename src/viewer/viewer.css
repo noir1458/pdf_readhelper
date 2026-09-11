@@ -793,17 +793,14 @@ button:disabled {
   min-width: 0;
   display: grid;
   grid-template-columns: 48px 1fr;
+  padding-top: var(--bar-height);
   background: #202328;
   border-right: 1px solid var(--border);
   overflow: hidden;
   box-shadow: 10px 0 30px rgba(0, 0, 0, 0.24);
   transition:
     width 0.18s ease,
-    box-shadow 0.18s ease,
-    padding-top 0.22s cubic-bezier(0.2, 0.72, 0.25, 1);
-}
-.topbar:not(.is-compact) ~ .viewer-shell .document-sidebar {
-  padding-top: var(--bar-height);
+    box-shadow 0.18s ease;
 }
 .document-sidebar:not(:hover):not(:has(:focus-visible)) {
   width: 48px;
