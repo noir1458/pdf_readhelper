@@ -5,7 +5,7 @@ import { originalPdfFilename, pageImageFilename, rangeFilename } from "../shared
 import { isExtensionMessage } from "../shared/messages";
 import { classifyPdfUrl, sourceUrlFromLocation } from "../shared/source";
 import type { PageRange } from "../shared/range";
-import type { PageSlot, PdfSource } from "../shared/types";
+import type { PageSlot, PdfSource, ZoomMode } from "../shared/types";
 import { OPENAI_TRANSLATION_MODEL, translatePageImage } from "../translation/openai-translation";
 import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
 import { DocumentToolbar } from "../ui/document-toolbar";
@@ -53,7 +53,9 @@ import {
   DocumentLibrary,
   documentLibraryId,
   documentLibraryTitle,
+  normalizeSavedDocumentView,
   renderLibraryThumbnail,
+  type SavedDocumentView,
   type SavedDocumentSummary,
 } from "./document-library";
 import { loadLocalFile, loadPdfUrl } from "./pdf-loader";
@@ -509,8 +511,6 @@ async function openBytes(
   pageStack.replaceChildren();
 
   const pdfDocument = await session.load(bytes, source);
-  updateRotationButton();
-  updatePageLayout();
   documentSearch = new PdfDocumentSearch(pdfDocument);
   const libraryId = options.savedMetadata?.id ?? documentLibraryId(pdfDocument, source);
   let savedMetadata = options.savedMetadata;
@@ -522,6 +522,10 @@ async function openBytes(
     }
   }
   const initialPage = Math.min(pdfDocument.numPages, Math.max(1, savedMetadata?.lastPage ?? 1));
+  await restoreDocumentView(normalizeSavedDocumentView(savedMetadata?.view), initialPage);
+  const initialView = currentDocumentView();
+  updateRotationButton();
+  updatePageLayout();
   createSlots(pdfDocument.numPages);
   renderer = new PageRenderer(
     pdfDocument,
@@ -530,6 +534,7 @@ async function openBytes(
     undefined,
     (target) => void activatePdfLink(target),
   );
+  renderer.setRotation(session.snapshot.rotation);
   observeRendering();
   tracker.observe([...slots.values()].map((slot) => slot.element));
   totalPages.textContent = String(pdfDocument.numPages);
@@ -561,7 +566,15 @@ async function openBytes(
     void saveReadingPositionNow().then(refreshDocumentLibrary).catch(reportLibraryError);
   } else {
     const storedBytes = session.requireBytes().slice().buffer;
-    void rememberDocument(pdfDocument, source, libraryId, initialPage, storedBytes, savedMetadata);
+    void rememberDocument(
+      pdfDocument,
+      source,
+      libraryId,
+      initialPage,
+      initialView,
+      storedBytes,
+      savedMetadata,
+    );
   }
   toast.show(
     `Opened ${pdfDocument.numPages} page${pdfDocument.numPages === 1 ? "" : "s"}`,
@@ -987,11 +1000,35 @@ async function reorderSavedDocuments(ids: string[]): Promise<void> {
   await refreshDocumentLibrary();
 }
 
+async function restoreDocumentView(view: SavedDocumentView, pageNumber: number): Promise<void> {
+  session.setRotation(view.rotation);
+  session.setPageLayout(view.pageLayout);
+  session.setZoom(view.zoom, view.zoomMode);
+  const fitMode = fitModeFromZoomMode(view.zoomMode);
+  if (!fitMode) return;
+  try {
+    session.setZoom(clampViewZoom(await fittedZoomForPage(fitMode, pageNumber)), view.zoomMode);
+  } catch {
+    // Keep the last calculated scale when this particular page cannot be measured.
+  }
+}
+
+function currentDocumentView(): SavedDocumentView {
+  const snapshot = session.snapshot;
+  return {
+    zoom: snapshot.zoom,
+    zoomMode: snapshot.zoomMode,
+    rotation: snapshot.rotation,
+    pageLayout: snapshot.pageLayout,
+  };
+}
+
 async function rememberDocument(
   pdfDocument: ReturnType<DocumentSession["requireDocument"]>,
   source: PdfSource,
   id: string,
   initialPage: number,
+  initialView: SavedDocumentView,
   bytes: ArrayBuffer,
   previous?: SavedDocumentSummary,
 ): Promise<void> {
@@ -1011,6 +1048,7 @@ async function rememberDocument(
         source,
         thumbnail,
         lastPage: activeDocumentId === id ? session.snapshot.currentPage : initialPage,
+        view: activeDocumentId === id ? currentDocumentView() : initialView,
         totalPages: pdfDocument.numPages,
         updatedAt: Date.now(),
         ...(previous?.sortOrder === undefined ? {} : { sortOrder: previous.sortOrder }),
@@ -1046,7 +1084,19 @@ async function saveReadingPositionNow(): Promise<void> {
   window.clearTimeout(positionSaveTimer);
   positionSaveTimer = 0;
   if (!activeDocumentId) return;
-  await documentLibrary.updateLastPage(activeDocumentId, session.snapshot.currentPage);
+  await documentLibrary.updateReadingState(
+    activeDocumentId,
+    session.snapshot.currentPage,
+    currentDocumentView(),
+  );
+}
+
+function scheduleViewStateSave(): void {
+  if (!activeDocumentId) return;
+  window.clearTimeout(positionSaveTimer);
+  positionSaveTimer = window.setTimeout(() => {
+    void saveReadingPositionNow().catch(reportLibraryError);
+  }, 350);
 }
 
 function flushReadingPosition(): void {
@@ -1058,38 +1108,53 @@ function reportLibraryError(): void {
   toast.show("The PDF is open, but its saved-document entry could not be updated.", "error", 5600);
 }
 
-function setZoom(value: number): void {
+function setZoom(value: number, mode: ZoomMode = "manual"): void {
   if (!renderer) return;
-  const zoom = Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, value));
-  session.setZoom(zoom);
+  const zoom = clampViewZoom(value);
+  session.setZoom(zoom, mode);
   renderer.setZoom(zoom);
   void renderNear(session.snapshot.currentPage);
+  scheduleViewStateSave();
+}
+
+function clampViewZoom(value: number): number {
+  return Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, value));
 }
 
 async function fitPage(mode: FitMode): Promise<void> {
   if (!renderer) return;
   try {
-    const page = await session.requireDocument().getPage(session.snapshot.currentPage);
-    const viewport = page.getViewport({
-      scale: 1,
-      rotation: normalizeRotation(page.rotate + session.snapshot.rotation),
-    });
-    const horizontalMargin = window.innerWidth <= 760 ? 24 : 56;
-    const availableWidth = pageWidthForLayout(
-      Math.max(120, scroller.clientWidth - horizontalMargin),
-      session.snapshot.pageLayout,
-    );
-    const scale = fittedScale(
-      viewport.width,
-      viewport.height,
-      availableWidth,
-      Math.max(120, scroller.clientHeight - 48),
-      mode,
-    );
-    setZoom(scale);
+    const scale = await fittedZoomForPage(mode, session.snapshot.currentPage);
+    setZoom(scale, mode === "width" ? "fit-width" : "fit-height");
   } catch (error) {
     toast.show(`Could not fit page: ${errorMessage(error)}`, "error");
   }
+}
+
+async function fittedZoomForPage(mode: FitMode, pageNumber: number): Promise<number> {
+  const page = await session.requireDocument().getPage(pageNumber);
+  const viewport = page.getViewport({
+    scale: 1,
+    rotation: normalizeRotation(page.rotate + session.snapshot.rotation),
+  });
+  const horizontalMargin = window.innerWidth <= 760 ? 24 : 56;
+  const availableWidth = pageWidthForLayout(
+    Math.max(120, scroller.clientWidth - horizontalMargin),
+    session.snapshot.pageLayout,
+  );
+  return fittedScale(
+    viewport.width,
+    viewport.height,
+    availableWidth,
+    Math.max(120, scroller.clientHeight - 48),
+    mode,
+  );
+}
+
+function fitModeFromZoomMode(mode: ZoomMode): FitMode | null {
+  if (mode === "fit-width") return "width";
+  if (mode === "fit-height") return "height";
+  return null;
 }
 
 function rotateClockwise(): void {
@@ -1099,7 +1164,10 @@ function rotateClockwise(): void {
   session.setRotation(rotation);
   renderer.setRotation(rotation);
   updateRotationButton();
-  void renderNear(pageNumber).then(() => {
+  const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
+  const rerender = fitMode ? fitPage(fitMode) : renderNear(pageNumber);
+  scheduleViewStateSave();
+  void rerender.then(() => {
     slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
   });
   toast.show(`Rotated to ${rotation}°`, "success");
@@ -1116,6 +1184,9 @@ function togglePageLayout(): void {
   const pageNumber = session.snapshot.currentPage;
   session.setPageLayout(session.snapshot.pageLayout === "single" ? "spread" : "single");
   updatePageLayout();
+  const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
+  if (fitMode) void fitPage(fitMode);
+  scheduleViewStateSave();
   window.requestAnimationFrame(() => {
     slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
   });

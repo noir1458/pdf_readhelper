@@ -1,6 +1,14 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import type { PdfSource } from "../shared/types";
+import { DEFAULT_VIEW_SCALE, MAX_VIEW_SCALE, MIN_VIEW_SCALE } from "../shared/constants";
+import type { PageLayout, PdfSource, ViewRotation, ZoomMode } from "../shared/types";
 import { canvasDimensions, limitedScale } from "./render-math";
+
+export type SavedDocumentView = {
+  zoom: number;
+  zoomMode: ZoomMode;
+  rotation: ViewRotation;
+  pageLayout: PageLayout;
+};
 
 export type SavedDocumentSummary = {
   id: string;
@@ -11,6 +19,7 @@ export type SavedDocumentSummary = {
   totalPages: number;
   updatedAt: number;
   sortOrder?: number;
+  view?: SavedDocumentView;
 };
 
 export type SavedDocument = SavedDocumentSummary & {
@@ -71,13 +80,13 @@ export class DocumentLibrary {
     await transactionDone(transaction);
   }
 
-  async updateLastPage(id: string, pageNumber: number): Promise<void> {
+  async updateReadingState(id: string, pageNumber: number, view: SavedDocumentView): Promise<void> {
     const database = await this.#database();
     const transaction = database.transaction(METADATA_STORE, "readwrite");
     const store = transaction.objectStore(METADATA_STORE);
     const metadata = await requestResult<SavedDocumentSummary | undefined>(store.get(id));
     if (metadata) {
-      store.put({ ...metadata, lastPage: pageNumber, updatedAt: Date.now() });
+      store.put({ ...metadata, lastPage: pageNumber, view, updatedAt: Date.now() });
     }
     await transactionDone(transaction);
   }
@@ -136,6 +145,30 @@ export function sortSavedDocuments(records: SavedDocumentSummary[]): SavedDocume
     if (leftHasOrder !== rightHasOrder) return leftHasOrder ? 1 : -1;
     return right.updatedAt - left.updatedAt;
   });
+}
+
+export function normalizeSavedDocumentView(value: unknown): SavedDocumentView {
+  const candidate = isRecord(value) ? value : {};
+  const zoom = candidate.zoom;
+  const zoomMode = candidate.zoomMode;
+  const rotation = candidate.rotation;
+  const pageLayout = candidate.pageLayout;
+  return {
+    zoom:
+      typeof zoom === "number" &&
+      Number.isFinite(zoom) &&
+      zoom >= MIN_VIEW_SCALE &&
+      zoom <= MAX_VIEW_SCALE
+        ? zoom
+        : DEFAULT_VIEW_SCALE,
+    zoomMode:
+      zoomMode === "fit-width" || zoomMode === "fit-height" || zoomMode === "manual"
+        ? zoomMode
+        : "manual",
+    rotation:
+      rotation === 90 || rotation === 180 || rotation === 270 || rotation === 0 ? rotation : 0,
+    pageLayout: pageLayout === "spread" ? "spread" : "single",
+  };
 }
 
 export function documentLibraryId(document: PDFDocumentProxy, source: PdfSource): string {
@@ -201,4 +234,8 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
       reject(transaction.error ?? new Error("Storage failed.")),
     );
   });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

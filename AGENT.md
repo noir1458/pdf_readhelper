@@ -142,13 +142,13 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 - PDF.js loading task and document proxy
 - total page count
 - current page (updated only through `PageTracker` callback)
-- zoom mode/scale
-- document-session view rotation (`0`, `90`, `180`, or `270` degrees; reset when opening another document)
-- page layout (`single` continuous column or cover-first `spread`; reset when opening another document)
+- zoom mode/scale (reset before a saved document's view is restored)
+- document-session view rotation (`0`, `90`, `180`, or `270` degrees; reset before saved-state restoration)
+- page layout (`single` continuous column or cover-first `spread`; reset before saved-state restoration)
 - rendered page slots and render lifecycle
 - document-level load/error lifecycle
 
-`DocumentLibrary` owns persistent extension-local IndexedDB records. Metadata and file bytes use separate object stores so listing cover/title/page summaries does not read every saved PDF into memory. Each record includes a PDF fingerprint ID, source descriptor, title, small first-page thumbnail, total pages, last-read page, update timestamp, optional user-defined sort order, and locally cached PDF bytes. Legacy records without a sort order remain newest-first until the user drags the list; new unordered documents appear before an existing manual sequence.
+`DocumentLibrary` owns persistent extension-local IndexedDB records. Metadata and file bytes use separate object stores so listing cover/title/page summaries does not read every saved PDF into memory. Each record includes a PDF fingerprint ID, source descriptor, title, small first-page thumbnail, total pages, last-read page, optional manual/Fit zoom state, rotation, single/spread layout, update timestamp, optional user-defined sort order, and locally cached PDF bytes. View state is optional for schema compatibility; legacy records receive safe defaults without an IndexedDB migration. Legacy records without a sort order remain newest-first until the user drags the list; new unordered documents appear before an existing manual sequence.
 
 `TranslationCache` owns a separate IndexedDB database keyed by capture version, model, PDF fingerprint, and page. It stores translated text, token usage, model name, and update time, but never stores an API key or page image.
 
@@ -210,7 +210,7 @@ The top bar keeps its opening actions on the left and one compact page-control g
 - IMG: copy current page and toast `Page 7 copied`.
 - PDF: compact range popover, prefilled with current page; accepts `2`, `2-11`, and spaces; Enter extracts, while `×`, Escape, and outside clicks close it.
 - Reading theme: palette popover with Original, Sepia, and Dark radio-style options; selection persists locally and supports arrow-key changes.
-- The third sidebar view lists locally saved PDFs using small covers, filenames, and last-read page indicators. Selecting one swaps the active document; its remove button deletes only the cached extension copy. A visible grip supports drag reordering, which is persisted in IndexedDB.
+- The third sidebar view lists locally saved PDFs using small covers, filenames, and last-read page indicators. Selecting one swaps the active document and restores its page, manual zoom or Fit mode, rotation, and single/spread layout. Its remove button deletes only the cached extension copy. A visible grip supports drag reordering, which is persisted in IndexedDB.
 - The fourth sidebar view lists the active PDF's bookmarked pages by title, optional short note, and page number. Selecting one navigates to it; `✎` opens an inline title/note editor and `×` removes it. Enter saves edits, while Escape or Cancel restores the row without changes. A blank edited title falls back to `Page N`. The toolbar ribbon toggles the current page and exposes its state with `aria-pressed`.
 - Previous/next view buttons traverse explicit page jumps from thumbnails, outline entries, bookmarks, search results, PDF links, the page field, and Home/End. Continuous scrolling does not flood the history; the actual page visible when the reader next jumps replaces that departure point. Opening another PDF clears the history.
 - Focus mode requests browser fullscreen and hides the complete top toolbar, sidebar, and translation panel while retaining their underlying open state for restoration. F or Escape exits; failure to obtain browser fullscreen leaves the in-page distraction-free mode active with a toast explanation.
@@ -252,7 +252,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides persistent continuous-scroll and page-turn flows, current/total page display, bounded previous/next page-jump history, a temporary focus/fullscreen mode, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, editable per-PDF page bookmarks with short notes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. Direct toolbar space is reserved for zoom, fit, More, IMG/PDF/AI, and the page field; secondary view/navigation/document commands live in More rather than overflowing narrow windows. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. Paged flow hides non-active slots instead of building a second renderer, while continuous flow restores the complete vertical stack. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, saved documents, and the active PDF's bookmarks. When enabled, it rests as a 48px icon rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail, outline, and bookmark navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page, and the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides persistent continuous-scroll and page-turn flows, current/total page display, bounded previous/next page-jump history, a temporary focus/fullscreen mode, zoom in/out, separate fit-width and fit-height icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, editable per-PDF page bookmarks with short notes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. Direct toolbar space is reserved for zoom, fit, More, IMG/PDF/AI, and the page field; secondary view/navigation/document commands live in More rather than overflowing narrow windows. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width reserves half the available content width per sheet. Paged flow hides non-active slots instead of building a second renderer, while continuous flow restores the complete vertical stack. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A collapsible left sidebar switches between lazy page thumbnails, the PDF's embedded outline, saved documents, and the active PDF's bookmarks. When enabled, it rests as a 48px rail and expands as an overlay on hover/focus so it never reduces the PDF viewport width. While the top toolbar is expanded, the sidebar's tabs and panel content animate downward by the toolbar height so neither layer obscures the other. Thumbnail, outline, and bookmark navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page and validated per-document zoom/Fit, rotation, and layout state, while the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
@@ -320,6 +320,7 @@ Unit tests cover:
 - clockwise rotation normalization, wrapping, and intrinsic/user rotation composition
 - per-page fit-width calculation for single-column and two-page spread layouts
 - saved-document title derivation
+- saved-document view defaults, validation, and legacy-record compatibility
 - OpenAI Responses text extraction and translation cache-key separation
 - reading-key classification and overlap-preserving viewport offsets
 - focus-mode F/Escape shortcut classification and modifier preservation
@@ -394,7 +395,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 87 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 90 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -415,6 +416,7 @@ npm run check
 - [x] Added temporary focus/fullscreen reading mode with full viewer-chrome hiding and F/Escape controls
 - [x] Added persisted page-turn flow with single/spread grouping, edge controls, and contextual reading keys
 - [x] Consolidated secondary toolbar actions into an accessible labeled More panel for narrow-window use
+- [x] Persisted and restored per-document manual/Fit zoom, rotation, and single/spread layout state
 
 ### In progress
 
@@ -635,3 +637,11 @@ npm run check
 **Reason:** The complete feature set no longer fits comfortably in narrower viewer windows, while most secondary actions are changed occasionally or already have keyboard shortcuts. A stable compact toolbar preserves PDF space and keeps the primary page actions beside page state.
 
 **Consequences:** Secondary actions require one additional click, and nested theme/search popovers plus the existing toolbar auto-hide animation require manual Chrome verification. Reading statistics remain out of scope because they add persistence and UI without helping the core page-preparation workflow.
+
+### 2026-09-11 — Restore document-specific view state
+
+**Decision:** Extend each saved-document metadata record with an optional validated view object containing manual/Fit zoom mode and scale, clockwise rotation, and single/spread layout. Save it with the existing debounced last-page update and restore it before constructing the new page renderer. Keep reading theme and continuous/page-turn flow viewer-wide.
+
+**Reason:** Returning to a technical book should reproduce the useful reading setup as well as its page number. Optional metadata fields preserve all existing IndexedDB records without a schema migration, while remembering Fit intent allows a restored document to recalculate against the current viewport rather than blindly reusing an old pixel scale.
+
+**Consequences:** Legacy or malformed view metadata falls back field-by-field to safe defaults. Manual zoom, Fit selection, rotation, and layout changes now update local document metadata; restored state and rapid document switching require manual Chrome verification.

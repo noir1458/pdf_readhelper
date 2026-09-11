@@ -1,9 +1,53 @@
 import { describe, expect, it } from "vitest";
 import {
   documentLibraryTitle,
+  normalizeSavedDocumentView,
   sortSavedDocuments,
   type SavedDocumentSummary,
 } from "../src/viewer/document-library";
+
+describe("saved document view state", () => {
+  it("uses defaults for legacy records without view state", () => {
+    expect(normalizeSavedDocumentView(undefined)).toEqual({
+      zoom: 1.2,
+      zoomMode: "manual",
+      rotation: 0,
+      pageLayout: "single",
+    });
+  });
+
+  it("retains a valid saved view", () => {
+    expect(
+      normalizeSavedDocumentView({
+        zoom: 1.75,
+        zoomMode: "fit-width",
+        rotation: 270,
+        pageLayout: "spread",
+      }),
+    ).toEqual({
+      zoom: 1.75,
+      zoomMode: "fit-width",
+      rotation: 270,
+      pageLayout: "spread",
+    });
+  });
+
+  it("replaces malformed or unsafe values independently", () => {
+    expect(
+      normalizeSavedDocumentView({
+        zoom: Number.POSITIVE_INFINITY,
+        zoomMode: "fit-page",
+        rotation: 45,
+        pageLayout: "book",
+      }),
+    ).toEqual({
+      zoom: 1.2,
+      zoomMode: "manual",
+      rotation: 0,
+      pageLayout: "single",
+    });
+  });
+});
 
 describe("saved document titles", () => {
   it("keeps a local filename", () => {

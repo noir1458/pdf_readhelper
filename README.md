@@ -25,7 +25,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Focus/fullscreen reading mode that temporarily hides all viewer chrome
 - Collapsible left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Hover-expanding sidebar rail that overlays the document instead of reducing its width
-- Local saved-document shelf with cover thumbnails, filenames, last-read pages, and persistent drag reordering
+- Local saved-document shelf with covers, last-read pages, per-document view state, and persistent drag reordering
 - Per-document page restoration across viewer and browser restarts
 - Persistent per-PDF page bookmarks with editable local titles, short notes, and sidebar navigation
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
@@ -113,9 +113,9 @@ Both actions reuse the already loaded bytes. They do not render hundreds of page
 
 - The third sidebar tab lists PDFs previously opened in the reader with a small cover, filename, and last-read page.
 - Drag an entry by its grip to reorder the saved PDFs. The custom order persists across browser restarts.
-- Select an entry to switch documents. The viewer restores that document to its last-read page.
+- Select an entry to switch documents. The viewer restores its last-read page, manual zoom or Fit mode, rotation, and single/spread layout.
 - Use the entry's `×` button to remove the extension's saved copy. This does not delete the original file.
-- PDFs and page positions are stored locally in the extension's IndexedDB and are never uploaded.
+- PDFs, page positions, and document view settings are stored locally in the extension's IndexedDB and are never uploaded.
 
 ### Page bookmarks
 
@@ -192,7 +192,7 @@ Chrome controls this setting; the extension cannot enable it automatically.
 - `pdfjs-dist` with a local extension-bundled worker, CMaps, fonts, WASM, and ICC data
 - `@cantoo/pdf-lib` for original page copying
 - Viewer-owned PDF bytes and state
-- IndexedDB-backed saved-document metadata, PDF bytes, cover thumbnail, and last-read page
+- IndexedDB-backed saved-document metadata, PDF bytes, cover thumbnail, last-read page, and view state
 - LocalStorage-backed reading theme and continuous/page-turn flow preferences
 - Separate IndexedDB translation cache containing returned text and token counts, never API keys or page images
 - Direct Responses API client for explicitly requested current-page translation
@@ -245,11 +245,11 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Scroll through a 10+ page document and confirm the page counter follows
 - [ ] Open a 100+ page document and inspect that distant canvases are released
 - [ ] Switch between thumbnails and table of contents; navigate with both
-- [ ] Switch between two saved PDFs, drag them into a new order, and verify the cover/title list, persistent order, and restored page
+- [ ] Switch between two saved PDFs, drag them into a new order, and verify persistent order plus restored page, zoom/Fit mode, rotation, and single/spread layout
 - [ ] Bookmark text and scanned pages, edit a title/note with Enter and cancel with Escape, switch PDFs/reload Chrome, and verify navigation, pressed state, persistence, and removal
 - [ ] Jump with thumbnails, outline, bookmarks, search, PDF links, page input, and Home/End; verify previous/next view buttons and Alt+Left/Right follow history, capture the page reached by scrolling, clear the forward branch after a new jump, and reset for another PDF
 - [ ] Enter focus mode with its toolbar button and F; verify browser fullscreen plus hidden toolbar/sidebar/translation panel, then exit with F and Escape and confirm the previous layout returns
-- [ ] Reload Chrome and verify that saved documents and last-read pages remain available
+- [ ] Reload Chrome and verify that saved documents, last-read pages, and per-document view settings remain available
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height

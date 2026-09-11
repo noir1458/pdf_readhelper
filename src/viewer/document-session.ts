@@ -13,7 +13,13 @@ import {
   PDF_WORKER_PATH,
 } from "../shared/constants";
 import { UserFacingError } from "../shared/errors";
-import type { DocumentSnapshot, PageLayout, PdfSource, ViewRotation } from "../shared/types";
+import type {
+  DocumentSnapshot,
+  PageLayout,
+  PdfSource,
+  ViewRotation,
+  ZoomMode,
+} from "../shared/types";
 
 GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(PDF_WORKER_PATH);
 
@@ -25,6 +31,7 @@ export class DocumentSession {
   #totalPages = 0;
   #currentPage = 1;
   #zoom = DEFAULT_VIEW_SCALE;
+  #zoomMode: ZoomMode = "manual";
   #rotation: ViewRotation = 0;
   #pageLayout: PageLayout = "single";
   #status: DocumentSnapshot["status"] = "idle";
@@ -39,6 +46,7 @@ export class DocumentSession {
       totalPages: this.#totalPages,
       currentPage: this.#currentPage,
       zoom: this.#zoom,
+      zoomMode: this.#zoomMode,
       rotation: this.#rotation,
       pageLayout: this.#pageLayout,
       status: this.#status,
@@ -89,8 +97,9 @@ export class DocumentSession {
     if (pageNumber >= 1 && pageNumber <= this.#totalPages) this.#currentPage = pageNumber;
   }
 
-  setZoom(zoom: number): void {
+  setZoom(zoom: number, mode: ZoomMode = "manual"): void {
     this.#zoom = zoom;
+    this.#zoomMode = mode;
   }
 
   setRotation(rotation: ViewRotation): void {
@@ -110,6 +119,8 @@ export class DocumentSession {
     this.#originalBytes = null;
     this.#source = null;
     this.#totalPages = 0;
+    this.#zoom = DEFAULT_VIEW_SCALE;
+    this.#zoomMode = "manual";
     this.#rotation = 0;
     this.#pageLayout = "single";
     this.#status = "idle";
