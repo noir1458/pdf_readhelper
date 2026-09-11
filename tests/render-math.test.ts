@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canvasDimensions,
+  fitModeForZoomMode,
   fittedScale,
   limitedScale,
   nextRotation,
@@ -9,6 +10,13 @@ import {
 } from "../src/viewer/render-math";
 
 describe("render sizing", () => {
+  it("maps saved zoom intent back to the matching fit operation", () => {
+    expect(fitModeForZoomMode("fit-width")).toBe("width");
+    expect(fitModeForZoomMode("fit-height")).toBe("height");
+    expect(fitModeForZoomMode("fit-content")).toBe("content");
+    expect(fitModeForZoomMode("manual")).toBeNull();
+  });
+
   it("keeps scale below the pixel cap", () => {
     const scale = limitedScale(10_000, 10_000, 2, 16_000_000);
     expect(scale).toBeCloseTo(0.4);

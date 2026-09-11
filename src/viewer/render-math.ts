@@ -1,7 +1,14 @@
-import type { PageLayout, ViewRotation } from "../shared/types";
+import type { PageLayout, ViewRotation, ZoomMode } from "../shared/types";
 
 export type Dimensions = { width: number; height: number };
 export type FitMode = "width" | "height" | "content";
+
+export function fitModeForZoomMode(mode: ZoomMode): FitMode | null {
+  if (mode === "fit-width") return "width";
+  if (mode === "fit-height") return "height";
+  if (mode === "fit-content") return "content";
+  return null;
+}
 
 export function normalizeRotation(value: number): ViewRotation {
   const normalized = (((Math.round(value / 90) * 90) % 360) + 360) % 360;

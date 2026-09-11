@@ -74,6 +74,7 @@ import { namedActionPage, type PdfLinkTarget } from "./pdf-link-layer";
 import { PdfDocumentSearch, type PdfSearchMatch } from "./pdf-search";
 import { extractPdfRange } from "./range-extractor";
 import {
+  fitModeForZoomMode,
   fittedScale,
   nextRotation,
   normalizeRotation,
@@ -136,6 +137,7 @@ let translationRequestController: AbortController | null = null;
 let topbarCollapseTimer = 0;
 let sidebarCollapseTimer = 0;
 let fitRequestGeneration = 0;
+let fitViewportResizeTimer = 0;
 let searchTimer = 0;
 let documentSearch: PdfDocumentSearch | null = null;
 let searchController: AbortController | null = null;
@@ -146,6 +148,9 @@ let bookmarkBusy = false;
 let pageFlow: PageFlow = readPageFlow();
 let pagedVisiblePages = new Set<number>();
 const contentMeasurements = new Map<string, Promise<PageContentMeasurement>>();
+
+const fitViewportObserver = new ResizeObserver(() => schedulePagedFitForViewportResize());
+fitViewportObserver.observe(scroller, { box: "border-box" });
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -531,6 +536,8 @@ async function openBytes(
   tracker.disconnect();
   documentSidebar.destroy();
   fitRequestGeneration += 1;
+  window.clearTimeout(fitViewportResizeTimer);
+  fitViewportResizeTimer = 0;
   contentMeasurements.clear();
   setSidebarAvailable(false);
   focusMode.setAvailable(false);
@@ -1045,7 +1052,7 @@ async function restoreDocumentView(view: SavedDocumentView, pageNumber: number):
   session.setRotation(view.rotation);
   session.setPageLayout(view.pageLayout);
   session.setZoom(view.zoom, view.zoomMode);
-  const fitMode = fitModeFromZoomMode(view.zoomMode);
+  const fitMode = fitModeForZoomMode(view.zoomMode);
   if (!fitMode) return;
   try {
     session.setZoom(clampViewZoom(await fittedZoomForPage(fitMode, pageNumber)), view.zoomMode);
@@ -1163,6 +1170,16 @@ function clampViewZoom(value: number): number {
   return Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, value));
 }
 
+function schedulePagedFitForViewportResize(): void {
+  window.clearTimeout(fitViewportResizeTimer);
+  fitViewportResizeTimer = window.setTimeout(() => {
+    fitViewportResizeTimer = 0;
+    if (pageFlow !== "paged" || !renderer) return;
+    const fitMode = fitModeForZoomMode(session.snapshot.zoomMode);
+    if (fitMode) void fitPage(fitMode);
+  }, 120);
+}
+
 async function fitPage(mode: FitMode, announceFallback = false): Promise<void> {
   const requestGeneration = ++fitRequestGeneration;
   const activeRenderer = renderer;
@@ -1170,6 +1187,17 @@ async function fitPage(mode: FitMode, announceFallback = false): Promise<void> {
   if (!activeRenderer || !activeDocument) return;
   const pageNumber = session.snapshot.currentPage;
   try {
+    if (pageFlow === "paged") {
+      await nextAnimationFrame();
+      if (
+        renderer !== activeRenderer ||
+        session.snapshot.document !== activeDocument ||
+        session.snapshot.currentPage !== pageNumber ||
+        fitRequestGeneration !== requestGeneration
+      ) {
+        return;
+      }
+    }
     const measurement = mode === "content" ? await contentMeasurementForPage(pageNumber) : null;
     const scale = await fittedZoomForPage(mode, pageNumber, measurement);
     if (
@@ -1254,7 +1282,7 @@ async function centerFittedContent(
   ) {
     return;
   }
-  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await nextAnimationFrame();
   if (requestGeneration !== undefined && fitRequestGeneration !== requestGeneration) return;
   const slotRect = slot.element.getBoundingClientRect();
   const scrollerRect = scroller.getBoundingClientRect();
@@ -1269,11 +1297,8 @@ async function centerFittedContent(
   });
 }
 
-function fitModeFromZoomMode(mode: ZoomMode): FitMode | null {
-  if (mode === "fit-width") return "width";
-  if (mode === "fit-height") return "height";
-  if (mode === "fit-content") return "content";
-  return null;
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
 function rotateClockwise(): void {
@@ -1284,7 +1309,7 @@ function rotateClockwise(): void {
   session.setRotation(rotation);
   renderer.setRotation(rotation);
   updateRotationButton();
-  const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
+  const fitMode = fitModeForZoomMode(session.snapshot.zoomMode);
   const rerender = fitMode ? fitPage(fitMode) : renderNear(pageNumber);
   scheduleViewStateSave();
   if (fitMode !== "content") {
@@ -1307,7 +1332,7 @@ function togglePageLayout(): void {
   const pageNumber = session.snapshot.currentPage;
   session.setPageLayout(session.snapshot.pageLayout === "single" ? "spread" : "single");
   updatePageLayout();
-  const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
+  const fitMode = fitModeForZoomMode(session.snapshot.zoomMode);
   if (fitMode) void fitPage(fitMode);
   scheduleViewStateSave();
   if (fitMode !== "content") {
@@ -1324,7 +1349,7 @@ function togglePageFlow(): void {
   writePageFlow(pageFlow);
   applyPageFlow();
   const pageNumber = session.snapshot.currentPage;
-  const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
+  const fitMode = fitModeForZoomMode(session.snapshot.zoomMode);
   if (fitMode === "content") void fitPage("content");
   else {
     window.requestAnimationFrame(() => {
