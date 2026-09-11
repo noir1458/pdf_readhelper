@@ -1,24 +1,34 @@
 import { UserFacingError } from "../shared/errors";
+import {
+  finiteNumber,
+  isRecord,
+  translationPrompt,
+  type PageTranslation,
+  type TranslationProvider,
+  type TranslationUsage,
+} from "./translation-provider";
 
 export const OPENAI_TRANSLATION_MODEL = "gpt-5.6-luna";
+export const OPENAI_TRANSLATION_MODELS = [
+  { id: OPENAI_TRANSLATION_MODEL, displayName: "GPT-5.6 Luna" },
+] as const;
 
-export type TranslationUsage = {
-  inputTokens?: number;
-  outputTokens?: number;
-};
-
-export type OpenAiPageTranslation = {
-  text: string;
-  model: string;
-  usage: TranslationUsage;
+export const OPENAI_TRANSLATION_PROVIDER: TranslationProvider = {
+  id: "openai",
+  displayName: "OpenAI",
+  defaultModelId: OPENAI_TRANSLATION_MODEL,
+  models: OPENAI_TRANSLATION_MODELS,
+  apiKeyPlaceholder: "sk-…",
+  translatePageImage,
 };
 
 export async function translatePageImage(
+  modelId: string,
   apiKey: string,
   image: Blob,
   pageNumber: number,
   signal?: AbortSignal,
-): Promise<OpenAiPageTranslation> {
+): Promise<PageTranslation> {
   const imageUrl = await blobToDataUrl(image);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -27,7 +37,7 @@ export async function translatePageImage(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: OPENAI_TRANSLATION_MODEL,
+      model: modelId,
       store: false,
       reasoning: { effort: "none" },
       max_output_tokens: 5_000,
@@ -58,7 +68,7 @@ export async function translatePageImage(
   if (!text) throw new UserFacingError("OpenAI returned no translated text for this page.");
   return {
     text,
-    model: responseModel(payload) ?? OPENAI_TRANSLATION_MODEL,
+    model: responseModel(payload) ?? modelId,
     usage: responseUsage(payload),
   };
 }
@@ -81,16 +91,6 @@ export function extractResponseText(payload: unknown): string | null {
   }
   const text = parts.join("\n").trim();
   return text.length > 0 ? text : null;
-}
-
-function translationPrompt(pageNumber: number): string {
-  return [
-    `Translate every readable part of PDF page ${pageNumber} into natural Korean.`,
-    "Do not summarize or omit content.",
-    "Preserve the original order and structure of headings, paragraphs, lists, captions, footnotes, and page labels.",
-    "Keep code, commands, paths, identifiers, and formulas unchanged, translating only their surrounding prose.",
-    "Return only the translation as clean plain text. Do not add commentary about the task or the image.",
-  ].join(" ");
 }
 
 function apiErrorMessage(status: number, payload: unknown): string {
@@ -117,14 +117,6 @@ function responseUsage(payload: unknown): TranslationUsage {
   if (inputTokens !== undefined) usage.inputTokens = inputTokens;
   if (outputTokens !== undefined) usage.outputTokens = outputTokens;
   return usage;
-}
-
-function finiteNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {

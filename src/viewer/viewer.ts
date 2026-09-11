@@ -6,8 +6,14 @@ import { isExtensionMessage } from "../shared/messages";
 import { classifyPdfUrl, sourceUrlFromLocation } from "../shared/source";
 import type { PageRange } from "../shared/range";
 import type { PageSlot, PdfSource, ZoomMode } from "../shared/types";
-import { OPENAI_TRANSLATION_MODEL, translatePageImage } from "../translation/openai-translation";
 import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
+import type { TranslationProviderId } from "../translation/translation-provider";
+import {
+  DEFAULT_TRANSLATION_PROVIDER_ID,
+  TRANSLATION_PROVIDER_INFO,
+  translationModel,
+  translationProvider,
+} from "../translation/translation-providers";
 import { DocumentToolbar } from "../ui/document-toolbar";
 import { FocusMode } from "../ui/focus-mode";
 import { KeyboardShortcutsPopover } from "../ui/keyboard-shortcuts-popover";
@@ -185,11 +191,20 @@ const toolbar = new DocumentToolbar(requireElement<HTMLElement>("#document-toolb
   toggleTranslation: toggleTranslationPanel,
 });
 
-const translationPanel = new TranslationPanel(requireElement<HTMLElement>("#translation-panel"), {
-  translate: requestPageTranslation,
-  reportError: (message) => toast.show(message, "error", 6500),
-  openChanged: (open) => toolbar.setTranslationOpen(open),
-});
+const translationPanel = new TranslationPanel(
+  requireElement<HTMLElement>("#translation-panel"),
+  TRANSLATION_PROVIDER_INFO,
+  DEFAULT_TRANSLATION_PROVIDER_ID,
+  {
+    translate: requestPageTranslation,
+    selectionChanged: (providerId, modelId, pageNumber) => {
+      translationRequestController?.abort();
+      translationRequestController = null;
+      void loadCachedTranslation(pageNumber, providerId, modelId);
+    },
+    openChanged: (open) => toolbar.setTranslationOpen(open),
+  },
+);
 
 const focusMode = new FocusMode(document.body, focusModeButton, {
   changed: (active) => {
@@ -583,7 +598,9 @@ async function openBytes(
   pageNavigationHistory.reset(initialPage);
   updatePageHistoryButtons();
   documentSidebar.setActiveDocument(libraryId);
-  if (translationPanel.isOpen) void loadCachedTranslation(initialPage);
+  if (translationPanel.isOpen) {
+    void loadCachedTranslation(initialPage, translationPanel.providerId, translationPanel.modelId);
+  }
   toolbar.show(pdfDocument.numPages);
   scheduleTopbarCollapse();
   setSidebarAvailable(true);
@@ -698,7 +715,9 @@ function updateCurrentPage(pageNumber: number): void {
   updatePageTurnButtons();
   scheduleReadingPositionSave(pageNumber);
   renderer?.releaseDistant(pageNumber);
-  if (translationPanel.isOpen) void loadCachedTranslation(pageNumber);
+  if (translationPanel.isOpen) {
+    void loadCachedTranslation(pageNumber, translationPanel.providerId, translationPanel.modelId);
+  }
 }
 
 function navigateFromInput(): void {
@@ -1038,7 +1057,14 @@ async function removeSavedDocument(id: string): Promise<void> {
     documentSidebar.setBookmarks([]);
     updateBookmarkButton();
   }
-  if (!activeDocumentId) translationPanel.showPage(session.snapshot.currentPage, null);
+  if (!activeDocumentId) {
+    translationPanel.showPage(
+      translationPanel.providerId,
+      translationPanel.modelId,
+      session.snapshot.currentPage,
+      null,
+    );
+  }
   await refreshDocumentLibrary();
   toast.show("Removed from saved documents", "success");
 }
@@ -1527,32 +1553,43 @@ function toggleTranslationPanel(): void {
   }
   const pageNumber = session.snapshot.currentPage;
   translationPanel.open(pageNumber);
-  void loadCachedTranslation(pageNumber);
+  void loadCachedTranslation(pageNumber, translationPanel.providerId, translationPanel.modelId);
 }
 
-async function loadCachedTranslation(pageNumber: number): Promise<void> {
+async function loadCachedTranslation(
+  pageNumber: number,
+  providerId: TranslationProviderId,
+  modelId: string,
+): Promise<void> {
   const documentId = activeDocumentId;
-  translationPanel.showPage(pageNumber, null);
+  translationPanel.showPage(providerId, modelId, pageNumber, null);
   if (!documentId) return;
+  const provider = translationProvider(providerId);
+  translationModel(provider, modelId);
   try {
-    const translation = await translationCache.get(
-      documentId,
-      pageNumber,
-      OPENAI_TRANSLATION_MODEL,
-    );
+    const translation = await translationCache.get(documentId, pageNumber, provider.id, modelId);
     if (
       translationPanel.isOpen &&
+      translationPanel.providerId === providerId &&
+      translationPanel.modelId === modelId &&
       activeDocumentId === documentId &&
       session.snapshot.currentPage === pageNumber
     ) {
-      translationPanel.showPage(pageNumber, translation);
+      translationPanel.showPage(providerId, modelId, pageNumber, translation);
     }
   } catch {
-    toast.show("저장된 번역을 불러오지 못했습니다.", "error");
+    translationPanel.showError(
+      providerId,
+      modelId,
+      pageNumber,
+      "저장된 번역을 불러오지 못했습니다.",
+    );
   }
 }
 
 async function requestPageTranslation(
+  providerId: TranslationProviderId,
+  modelId: string,
   pageNumber: number,
   apiKey: string,
 ): Promise<CachedPageTranslation> {
@@ -1562,15 +1599,24 @@ async function requestPageTranslation(
   translationRequestController?.abort();
   const controller = new AbortController();
   translationRequestController = controller;
+  const provider = translationProvider(providerId);
+  translationModel(provider, modelId);
   try {
     const pageImage = await renderPagePng(pdfDocument, pageNumber, {
       rotation: session.snapshot.rotation,
     });
-    const result = await translatePageImage(apiKey, pageImage, pageNumber, controller.signal);
+    const result = await provider.translatePageImage(
+      modelId,
+      apiKey,
+      pageImage,
+      pageNumber,
+      controller.signal,
+    );
     return await translationCache.put(
       documentId,
       pageNumber,
-      OPENAI_TRANSLATION_MODEL,
+      provider.id,
+      modelId,
       result.text,
       result.usage,
     );

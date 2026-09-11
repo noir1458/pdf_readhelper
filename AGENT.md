@@ -8,7 +8,7 @@ PDF Read Helper reduces the repeated friction involved in reading and translatin
 
 `PDF reading → local page preparation → clipboard/file or explicit translation`
 
-It locally renders a current PDF page to PNG or copies original PDF page objects into a smaller PDF. An optional, explicitly user-triggered panel sends only the prepared current-page image to the OpenAI Responses API and stores the returned translation locally.
+It locally renders a current PDF page to PNG or copies original PDF page objects into a smaller PDF. An optional, explicitly user-triggered panel sends only the prepared current-page image to the selected Gemini or OpenAI API and stores the returned translation locally.
 
 ## 2. Primary User
 
@@ -30,7 +30,7 @@ Entering `2-11` validates the inclusive range, copies original page objects 2 th
 
 ### Flow C — Current page → Korean translation
 
-Opening the right translation panel does not make a request. The user enters an OpenAI API key for the current viewer tab and explicitly clicks **Translate page**. The viewer uses the same locally cropped/resampled PNG pipeline as clipboard copy, sends one image with a translation instruction through the Responses API, displays the Korean result, and caches it by PDF fingerprint, page, model, and capture version. Revisiting a cached page does not create another request unless the user clicks **Translate again**.
+Opening the right translation panel does not make a request. The user selects Gemini or OpenAI plus one of that provider's configured models, enters the provider API key for the current viewer tab, and explicitly clicks **Translate page**. The viewer uses the same locally cropped/resampled PNG pipeline as clipboard copy, sends one image with a translation instruction through the selected provider/model API, displays the Korean result, and caches it by provider, model, PDF fingerprint, page, and capture version. Revisiting a cached page does not create another request unless the user clicks **Translate again**.
 
 ## 4. Explicit Non-goals
 
@@ -39,7 +39,7 @@ Initial versions do not include:
 - Persistent API-key storage, accounts, a backend, analytics, or telemetry
 - Automatic translation while scrolling or bulk whole-document translation
 - OCR or text-layer extraction as the primary translation path
-- Anthropic, Gemini, or other non-OpenAI model providers
+- Translation providers beyond Gemini and OpenAI, arbitrary model selection, or a general LLM plugin system
 - Chrome Web Store optimization
 - Direct integration with LLM websites, including automatic navigation, paste, or attachment
 - Chrome native PDF viewer DOM manipulation as a core mechanism
@@ -86,7 +86,7 @@ pdf_readhelper/
 │   ├── clipboard/clipboard.ts
 │   ├── popup/{popup.html,popup.ts,popup.css}
 │   ├── shared/{constants,errors,filename,messages,range,source,types}.ts
-│   ├── translation/{openai-translation,translation-cache}.ts
+│   ├── translation/{translation-provider,translation-providers,gemini-translation,openai-translation,translation-cache}.ts
 │   ├── ui/{document-toolbar,focus-mode,keyboard-shortcuts-popover,range-popover,reading-theme-picker,toolbar-overflow,toast,translation-panel,url-popover}.ts
 │   └── viewer/
 │       ├── viewer.html
@@ -111,7 +111,7 @@ pdf_readhelper/
 
 Responsibilities stay separated: loading/session state, visible rendering, page tracking, export rendering, extraction, clipboard, Chrome messaging, and UI components must not collapse into one large module.
 
-OpenAI requests use the browser `fetch` API rather than bundling an SDK. The API client owns request/response parsing only; the translation panel owns the session key and UI state; the cache owns persisted translation records; the viewer coordinates those modules with the active document.
+Gemini and OpenAI requests use the browser `fetch` API rather than bundling SDKs. A small provider contract isolates configured models and request/response parsing; the translation panel owns provider/model selection, provider-specific session keys, and UI state; the cache owns persisted translation records; the viewer coordinates those modules with the active document.
 
 ## 8. Chrome Permission Policy
 
@@ -126,10 +126,10 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 
 ## 9. Security / Privacy
 
-- PDF bytes remain local. Only a prepared image of the current page is sent to OpenAI after an explicit Translate action.
-- No analytics or telemetry. API keys are never committed, logged, or persisted; the translation panel retains the entered key only in the current tab's JavaScript memory.
+- PDF bytes remain local. Only a prepared image of the current page is sent to the selected Gemini or OpenAI API after an explicit Translate action.
+- No analytics or telemetry. API keys are never committed, logged, or persisted; the translation panel retains separate Gemini and OpenAI keys only in the current tab's JavaScript memory.
 - No PDF text or byte dumps in logs.
-- Translation requests set `store: false`; returned text is stored only in extension-local IndexedDB for page reuse.
+- OpenAI translation requests set `store: false`; returned Gemini/OpenAI text is stored only in extension-local IndexedDB for page reuse.
 - Remote scripts and CDN assets are forbidden by architecture and MV3 CSP.
 - The extension does not attempt authentication bypasses or cookie extraction.
 - Object URLs and temporary canvases are released after use.
@@ -151,7 +151,7 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 
 `DocumentLibrary` owns persistent extension-local IndexedDB records. Metadata and file bytes use separate object stores so listing cover/title/page summaries does not read every saved PDF into memory. Each record includes a PDF fingerprint ID, source descriptor, title, small first-page thumbnail, total pages, last-read page, optional manual/Fit zoom state, rotation, single/spread layout, update timestamp, optional user-defined sort order, and locally cached PDF bytes. View state is optional for schema compatibility; legacy records receive safe defaults without an IndexedDB migration. Legacy records without a sort order remain newest-first until the user drags the list; new unordered documents appear before an existing manual sequence.
 
-`TranslationCache` owns a separate IndexedDB database keyed by capture version, model, PDF fingerprint, and page. It stores translated text, token usage, model name, and update time, but never stores an API key or page image.
+`TranslationCache` owns a separate IndexedDB database keyed by capture version, provider, model, PDF fingerprint, and page. It stores translated text, token usage, provider/model identity, and update time, but never stores an API key or page image. Legacy OpenAI cache keys remain readable.
 
 `ReadingThemePicker` owns one viewer-wide `original`, `sepia`, or `dark` display preference in extension-page `localStorage`. It changes CSS presentation only and is intentionally separate from document state and exported content.
 
@@ -185,7 +185,7 @@ Users receive actionable inline/toast messages for:
 - clipboard failure (with PNG download fallback)
 - page render failure
 - PDF generation or download failure
-- missing/rejected OpenAI API keys, rate/spending limits, network failures, empty API output, and translation-cache failures
+- missing/rejected Gemini or OpenAI API keys, rate/quota/spending limits, network failures, blocked/empty API output, and translation-cache failures
 
 Errors are not swallowed. Console output may contain technical error objects during development but never PDF bytes/content.
 
@@ -216,7 +216,7 @@ The top bar keeps its opening actions on the left and one compact page-control g
 - Previous/next view buttons traverse explicit page jumps from thumbnails, outline entries, bookmarks, search results, PDF links, the page field, and Home/End. Continuous scrolling does not flood the history; the actual page visible when the reader next jumps replaces that departure point. Opening another PDF clears the history.
 - Focus mode requests browser fullscreen and hides the complete top toolbar, sidebar, and translation panel while retaining their underlying open state for restoration. F or Escape exits; failure to obtain browser fullscreen leaves the in-page distraction-free mode active with a toast explanation.
 - Page flow toggles between the existing continuous stack and a persisted page-turn presentation. Paged flow reveals only the active page in single layout or the active cover-first pair in spread layout, centers short pages safely, retains scrolling for oversized/zoomed pages, and shows translucent edge turn buttons. Returning to continuous flow unhides the existing slots without recreating the document.
-- AI opens a closable right panel. Its key form explains session-only handling and external page-image transmission. Translation never starts from scrolling or merely opening the panel. Cached results appear automatically and can be copied as text; explicit retranslation replaces the cached result.
+- AI opens a translucent right overlay without narrowing the PDF viewport. Its main surface is a lightweight conversation: a fixed page-translation request, a long scrolling response, persistent inline request errors, and a bottom row containing Translate, Settings, and Close. A gear popover opens upward from that row and contains provider/model selection plus provider-specific key replacement/deletion, keeping configuration out of the reading flow. Translation never starts from scrolling, opening the panel, or switching providers/models. Each provider/model's cached result appears automatically and can be copied as text; explicit retranslation replaces only that selection's cached result.
 - More closes after direct actions, Escape, or an outside pointer action. Theme and search remain nested interactive popovers; shortcut help opens as an independent sibling panel so it remains visible after More closes. Ctrl/Command+F opens More before focusing search so the keyboard path remains visible and usable.
 - No `alert()`; use non-blocking accessible live-region toasts.
 
@@ -253,7 +253,7 @@ Local files are read as `ArrayBuffer` and loaded by bytes. Remote/file URLs are 
 
 ## 17. PDF Viewer Requirements
 
-The viewer provides persistent continuous-scroll and page-turn flows, current/total page display, bounded previous/next page-jump history, a temporary focus/fullscreen mode, zoom in/out, separate fit-width, fit-height, and AI-free content-fit icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, editable per-PDF page bookmarks with short notes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. Direct toolbar space is reserved for zoom, fit, More, IMG/PDF/AI, and the page field; secondary view/navigation/document commands and an in-viewer keyboard reference live in More rather than overflowing narrow windows. Content Fit caches page/rotation measurements for the active document, remains a one-shot current-page operation in continuous flow to avoid zoom jumps while scrolling, and recalculates on page changes in page-turn flow. Page-turn mode also debounces viewer border-box resizes and reapplies the active width, height, or content Fit after layout settles, keeping a page consistent when the browser window or translation panel changes the available area. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width and content-fit reserve half the available width per sheet. Paged flow hides non-active slots instead of building a second renderer, while continuous flow restores the complete vertical stack. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A left-edge reveal strip slides the full sidebar over the PDF and hides it again after pointer/focus leave, replacing the permanent rail and toolbar hamburger. It switches between lazy page thumbnails, the PDF's embedded outline, saved documents, and the active PDF's bookmarks without reducing viewport width. Its tabs and panel content always reserve the full toolbar height above them, preventing any vertical motion when the independently animated top bar appears. Thumbnail, outline, and bookmark navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page and validated per-document zoom/Fit, rotation, and layout state, while the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
+The viewer provides persistent continuous-scroll and page-turn flows, current/total page display, bounded previous/next page-jump history, a temporary focus/fullscreen mode, zoom in/out, separate fit-width, fit-height, and AI-free content-fit icon controls, clockwise 90-degree view rotation, single-column and cover-first two-page spread layouts, persistent Original/Sepia/Dark display themes, editable per-PDF page bookmarks with short notes, original download/print controls, direct page navigation, local picker/drop, and a dark neutral surround with white pages. Direct toolbar space is reserved for zoom, fit, More, IMG/PDF/AI, and the page field; secondary view/navigation/document commands and an in-viewer keyboard reference live in More rather than overflowing narrow windows. Content Fit caches page/rotation measurements for the active document, remains a one-shot current-page operation in continuous flow to avoid zoom jumps while scrolling, and recalculates on page changes in page-turn flow. Page-turn mode also debounces viewer border-box resizes and reapplies the active width, height, or content Fit after layout settles, keeping a page consistent when the browser window changes the available area. In spread mode page 1 spans both grid columns alone, followed by 2–3, 4–5, and later pairs; fit-width and content-fit reserve half the available width per sheet. Paged flow hides non-active slots instead of building a second renderer, while continuous flow restores the complete vertical stack. Reading themes filter only visible main-page canvases; thumbnails and IMG/AI/PDF/print outputs remain source-colored. URL input is available on demand from an **Open URL** popover with close button, Escape, and outside-click dismissal. When the pointer leaves the full top toolbar, non-page controls slide upward while the adjacent IMG, PDF, AI, and current/total page controls remain fixed in their expanded-toolbar positions over a transparent bar. The full controls animate back from a 14px full-width top-edge hover target or keyboard focus. A left-edge reveal strip slides the full sidebar over the PDF and hides it again after pointer/focus leave, replacing the permanent rail and toolbar hamburger. It switches between lazy page thumbnails, the PDF's embedded outline, saved documents, and the active PDF's bookmarks without reducing viewport width. Its tabs and panel content always reserve the full toolbar height above them, preventing any vertical motion when the independently animated top bar appears. Thumbnail, outline, and bookmark navigation scroll the main viewer to the selected page; named outline destinations are resolved through PDF.js. Saved-document selection restores its last-read page and validated per-document zoom/Fit, rotation, and layout state, while the saved list supports persistent grip-based drag reordering. Canvas page and thumbnail rendering is lazy and bounded.
 
 Visible pages include a PDF.js text layer pinned to the installed `pdfjs-dist` version, enabling selection and native text copy. Full-document search indexes embedded text only when explicitly requested and reuses the in-memory page indexes for later queries in that document session. Search highlights are created only for the bounded set of rendered text layers. A separate minimal link layer accepts only PDF link annotations: internal destinations navigate through the viewer, safe HTTP(S)/email URLs open in a new tab, and common first/last/next/previous named page actions are supported. Forms, attachment actions, annotation editing/popups, and embedded PDF JavaScript remain disabled.
 
@@ -286,11 +286,11 @@ The extraction preserves normal page text/vector/image/layout/page dimensions. K
 
 ## 22. External Handoff and Translation
 
-Clipboard and extracted-PDF handoff remain explicitly user-controlled. Direct ChatGPT navigation/focus was removed after runtime verification showed it was not reliable enough to ship. Integrated translation is a separate explicit OpenAI API request; it does not navigate to or automate the ChatGPT website.
+Clipboard and extracted-PDF handoff remain explicitly user-controlled. Direct ChatGPT navigation/focus was removed after runtime verification showed it was not reliable enough to ship. Integrated translation is a separate explicit Gemini or OpenAI API request; it does not navigate to or automate either provider's website.
 
 ## 23. Options / Settings
 
-MVP uses named constants for export scale, pixel cap, render margin, and translation model. The lightweight reading-theme preference uses extension-page `localStorage`; a separate settings/options page is deferred until real usage identifies other useful controls. The API key remains intentionally session-memory-only, so no `storage` permission is needed.
+MVP uses named constants for export scale, pixel cap, render margin, and curated translation models. Gemini/OpenAI plus provider-specific model selection lives in the translation panel; arbitrary model-ID entry is intentionally omitted. The lightweight reading-theme preference uses extension-page `localStorage`; a separate settings/options page is deferred until real usage identifies other useful controls. Provider API keys remain intentionally session-memory-only, so no `storage` permission is needed.
 
 ## 24. Accessibility
 
@@ -322,12 +322,12 @@ Unit tests cover:
 - per-page fit-width calculation for single-column and two-page spread layouts
 - saved-document title derivation
 - saved-document view defaults, validation, and legacy-record compatibility
-- OpenAI Responses text extraction and translation cache-key separation
+- Gemini GenerateContent and OpenAI Responses text/usage extraction plus provider-aware translation cache-key separation
 - reading-key classification and overlap-preserving viewport offsets
 - focus-mode F/Escape shortcut classification and modifier preservation
 - PDF extraction using an in-memory generated fixture and output page-count/page-size checks
 
-Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, OpenAI translation, cached results, session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
+Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, Gemini/OpenAI provider and model switching, provider/model-specific cached results and session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
 
 ## 26. Build / Verification Commands
 
@@ -373,7 +373,7 @@ npm run check
 - Encrypted PDFs and some malformed/signed/form-heavy documents may not extract correctly.
 - Very large PDFs/pages remain bounded by browser memory despite lazy rendering and pixel limits.
 - Persisting many very large PDFs may hit Chrome's origin storage quota; users can remove cached copies without deleting originals.
-- Integrated translation requires the user's own billed OpenAI API key and network access. The key is forgotten when the viewer tab closes.
+- Integrated translation requires the user's own eligible Gemini or OpenAI API key and network access. Both provider keys are forgotten when the viewer tab closes.
 - Direct browser-held bearer credentials are for this private unpacked extension only; a public build requires a server-side credential design.
 
 ## 29. Current Status
@@ -390,13 +390,13 @@ npm run check
 - [x] Top document toolbar, accessible range popover, and toast feedback
 - [x] Independent current-page PNG rendering, clipboard write, and fallback download
 - [x] Local per-page neutral-margin detection, safe padded crop, full-page fallback, and 70% PNG resampling
-- [x] Explicit right-side OpenAI page translation, session-only API key, local page cache, token display, and translation copy
+- [x] Translucent conversation-style Gemini/OpenAI overlay with bottom Translate/Settings/Close controls, gear-contained provider/model/key settings, persistent inline errors/retry, provider/model-specific local cache, token display, and translation copy
 - [x] Animated auto-compacting top chrome with position-stable retained controls and an edge-revealed overlay sidebar
 - [x] Inclusive original-page PDF extraction with `7.pdf` / `2-11.pdf` naming
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 95 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 101 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -422,7 +422,7 @@ npm run check
 - [x] Stabilized sidebar content below the toolbar across compact/expanded top-bar states
 - [x] Replaced the toolbar hamburger and persistent sidebar rail with left-edge reveal behavior
 - [x] Added AI-free current-page Content Fit using cached neutral-margin detection and safe full-page fallback
-- [x] Stabilized page-turn Fit sizing across viewer/window and translation-panel width changes
+- [x] Stabilized page-turn Fit sizing across viewer/window resize changes
 
 ### In progress
 
@@ -431,7 +431,7 @@ npm run check
 ### Next
 
 1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
-2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, OpenAI requests, file URLs, or shortcut dispatch.
+2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, Gemini/OpenAI requests and switching, file URLs, or shortcut dispatch.
 3. Keep reading statistics out of scope; add a settings surface only if repeated real usage exposes a concrete preference that cannot remain a named constant.
 
 ### Blockers
@@ -683,3 +683,27 @@ npm run check
 **Reason:** Technical books often devote large areas to uniform paper margins, so fitting the physical page makes useful text unnecessarily small. Reusing deterministic local pixel analysis improves reading density without AI, OCR, network access, or altering the source PDF.
 
 **Consequences:** Continuous flow applies Content Fit to the page selected when the action is invoked rather than changing zoom on every scroll boundary. Page-turn flow recalculates for each destination page and, after a short debounce, whenever the viewer border box changes. A frame boundary after page visibility changes ensures scale measurement uses settled layout. Colored, blank, unstable-border, or otherwise uncertain pages safely use their full bounds. Centering, mixed page sizes, spread layout, rotation, resize behavior, and saved-state restoration require manual Chrome verification.
+
+### 2026-09-12 — Isolate and switch Gemini/OpenAI translation providers
+
+**Decision:** Introduce a narrow current-page-image translation provider contract, ship `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking plus the existing `gpt-5.6-luna` OpenAI Responses implementation, and expose compact native provider and model dropdowns in the translation panel. Remember the selected model separately per provider for the tab, keep a separate in-memory key per provider, include provider/model identity in cache keys, and retain read compatibility with legacy OpenAI cache records. Default new viewer tabs to Gemini 3.8 Flash without persisting the selection.
+
+**Reason:** The existing OpenAI translation was localized enough to separate before a second API made provider details spread through the viewer. A capability-specific boundary makes the two real implementations replaceable while keeping model selection to a small verified list instead of building an arbitrary LLM plugin system, free-form model picker, account store, or settings page.
+
+**Consequences:** Switching providers or models never sends a request and loads a distinct cached translation for the active page. Both keys and per-provider model selections disappear when the tab closes. The panel names the actual destination instead of presenting a misleading generic AI key, while arbitrary model-ID entry remains out of scope.
+
+### 2026-09-12 — Keep translation configuration out of the result flow
+
+**Decision:** Move provider, model, and key controls into a gear popover. Present the active page as a fixed translation request with one long response surface and a bottom action, and retain API failures inline with retry and settings recovery actions. Map Gemini 503 high-demand responses to a short Korean recovery message.
+
+**Reason:** Provider controls consumed the most prominent part of a panel whose primary job is reading translations, while toast-only failures disappeared before they could be inspected. A compact task-oriented conversation keeps the extension closer to the familiar AI reading flow without pretending to be a general chatbot.
+
+**Consequences:** First use opens the gear popover because a key is required; later opens return directly to the result flow. Escape closes settings before the panel, outside clicks dismiss settings, and request errors remain visible until the user retries, changes page/provider/model, or supplies a replacement key. Popover placement, long-result scrolling, and bottom-action behavior require manual unpacked-Chrome verification.
+
+### 2026-09-12 — Overlay the translation beside the source page
+
+**Decision:** Remove Settings and Close from the translation header and place them beside the bottom Translate action. Make the panel an always-overlaying translucent surface below the top toolbar instead of a flex column that narrows the PDF viewport. Anchor the settings popover above the bottom controls and use darker local backplates plus subtle text shadows only around request/response content.
+
+**Reason:** Header controls competed with the main toolbar and could be obscured. A translucent overlay preserves the full-size original underneath the translation, while localized contrast treatment keeps long Korean output readable without turning the whole panel opaque.
+
+**Consequences:** Opening AI no longer changes Fit dimensions or shifts the PDF. The overlay intentionally intercepts interaction in its right-side footprint while open; Close remains reachable at the bottom. Transparency and contrast over white, dark, scanned, and illustrated pages require manual Chrome tuning.

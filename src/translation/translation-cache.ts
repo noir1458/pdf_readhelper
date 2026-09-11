@@ -1,9 +1,10 @@
-import type { TranslationUsage } from "./openai-translation";
+import type { TranslationProviderId, TranslationUsage } from "./translation-provider";
 
 export type CachedPageTranslation = {
   id: string;
   documentId: string;
   pageNumber: number;
+  providerId: TranslationProviderId;
   model: string;
   text: string;
   usage: TranslationUsage;
@@ -22,30 +23,40 @@ export class TranslationCache {
   async get(
     documentId: string,
     pageNumber: number,
+    providerId: TranslationProviderId,
     model: string,
   ): Promise<CachedPageTranslation | null> {
     const database = await this.#database();
     const transaction = database.transaction(TRANSLATION_STORE, "readonly");
-    const record = await requestResult<CachedPageTranslation | undefined>(
-      transaction
-        .objectStore(TRANSLATION_STORE)
-        .get(translationCacheKey(documentId, pageNumber, model)),
+    const store = transaction.objectStore(TRANSLATION_STORE);
+    const recordPromise = requestResult<CachedPageTranslation | undefined>(
+      store.get(translationCacheKey(documentId, pageNumber, providerId, model)),
     );
+    const legacyRecordPromise =
+      providerId === "openai"
+        ? requestResult<LegacyCachedPageTranslation | undefined>(
+            store.get(legacyTranslationCacheKey(documentId, pageNumber, model)),
+          )
+        : Promise.resolve(undefined);
+    const [record, legacyRecord] = await Promise.all([recordPromise, legacyRecordPromise]);
     await transactionDone(transaction);
-    return record ?? null;
+    if (record) return record;
+    return legacyRecord ? { ...legacyRecord, providerId } : null;
   }
 
   async put(
     documentId: string,
     pageNumber: number,
+    providerId: TranslationProviderId,
     model: string,
     text: string,
     usage: TranslationUsage,
   ): Promise<CachedPageTranslation> {
     const record: CachedPageTranslation = {
-      id: translationCacheKey(documentId, pageNumber, model),
+      id: translationCacheKey(documentId, pageNumber, providerId, model),
       documentId,
       pageNumber,
+      providerId,
       model,
       text,
       usage,
@@ -90,7 +101,18 @@ export class TranslationCache {
   }
 }
 
-export function translationCacheKey(documentId: string, pageNumber: number, model: string): string {
+export function translationCacheKey(
+  documentId: string,
+  pageNumber: number,
+  providerId: TranslationProviderId,
+  model: string,
+): string {
+  return `${CAPTURE_VERSION}:${providerId}:${model}:${documentId}:${pageNumber}`;
+}
+
+type LegacyCachedPageTranslation = Omit<CachedPageTranslation, "providerId">;
+
+function legacyTranslationCacheKey(documentId: string, pageNumber: number, model: string): string {
   return `${CAPTURE_VERSION}:${model}:${documentId}:${pageNumber}`;
 }
 

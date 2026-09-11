@@ -677,51 +677,123 @@
             <strong>페이지 번역</strong>
             <span id="translation-page-label">페이지 1</span>
           </div>
-          <button
-            id="close-translation-panel"
-            class="icon-button translation-close"
-            type="button"
-            aria-label="Close translation panel"
-            title="Close"
-          >
-            ×
-          </button>
         </header>
 
-        <section id="translation-key-setup" class="translation-key-setup">
-          <h2>OpenAI API 키</h2>
-          <p>
-            키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. 번역 버튼을 누를 때 현재 페이지
-            이미지만 OpenAI로 전송됩니다.
-          </p>
-          <form id="translation-key-form">
-            <label for="translation-api-key">API key</label>
-            <input
-              id="translation-api-key"
-              type="password"
-              placeholder="sk-…"
-              autocomplete="off"
-              spellcheck="false"
-              required
-            />
-            <button class="primary" type="submit">이 탭에서 키 사용</button>
+        <section
+          id="translation-settings-popover"
+          class="translation-settings-popover"
+          role="dialog"
+          aria-label="번역 AI 설정"
+          hidden
+        >
+          <header>
+            <div>
+              <strong>번역 AI 설정</strong>
+              <span>공급자마다 키와 모델을 따로 사용합니다.</span>
+            </div>
+            <button
+              id="close-translation-settings"
+              class="icon-button"
+              type="button"
+              aria-label="설정 닫기"
+            >
+              ×
+            </button>
+          </header>
+          <div class="translation-settings-fields">
+            <label class="translation-setting-field" for="translation-provider">
+              <span>번역 AI</span>
+              <select id="translation-provider"></select>
+            </label>
+            <label class="translation-setting-field" for="translation-model">
+              <span>모델</span>
+              <select id="translation-model"></select>
+            </label>
+          </div>
+          <form id="translation-key-form" class="translation-key-form">
+            <label id="translation-api-key-label" for="translation-api-key">Gemini API key</label>
+            <div>
+              <input
+                id="translation-api-key"
+                type="password"
+                placeholder="AIza…"
+                autocomplete="off"
+                spellcheck="false"
+                required
+              />
+              <button id="translation-key-submit" class="primary" type="submit">키 사용</button>
+            </div>
           </form>
-          <p class="translation-key-warning">
-            개인용 확장프로그램 전용입니다. 공개 배포 시에는 API 키를 브라우저에 입력하지 말고 서버
-            프록시를 사용해야 합니다.
+          <p id="translation-key-state" class="translation-key-state" aria-live="polite"></p>
+          <button id="delete-translation-key" class="translation-delete-key" type="button">
+            현재 AI 키 삭제
+          </button>
+          <p id="translation-key-description" class="translation-key-description">
+            키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. 번역할 때 현재 페이지 이미지만
+            Gemini로 전송됩니다.
           </p>
         </section>
 
-        <section id="translation-workspace" class="translation-workspace" hidden>
-          <div class="translation-actions">
-            <button id="translate-current-page" class="primary" type="button">
-              이 페이지 번역
-            </button>
-            <button id="copy-translation" type="button" disabled>번역 복사</button>
-            <button id="change-translation-key" type="button">키 변경</button>
+        <section id="translation-workspace" class="translation-workspace">
+          <div class="translation-conversation">
+            <div class="translation-request">
+              <span aria-hidden="true">PDF</span>
+              <p id="translation-request-text">페이지 1을 원문 구조 그대로 한국어로 번역해줘.</p>
+            </div>
+            <div class="translation-response">
+              <div class="translation-ai-mark" aria-hidden="true">AI</div>
+              <div class="translation-response-body">
+                <p id="translation-status" class="translation-status" aria-live="polite"></p>
+                <div id="translation-error" class="translation-error" role="alert" hidden>
+                  <strong>번역하지 못했습니다</strong>
+                  <p id="translation-error-message"></p>
+                  <div>
+                    <button id="retry-translation" type="button">다시 시도</button>
+                    <button id="error-translation-settings" type="button">설정 확인</button>
+                  </div>
+                </div>
+                <article id="translation-output" class="translation-output"></article>
+                <div id="translation-result-actions" class="translation-result-actions" hidden>
+                  <button id="copy-translation" type="button">번역 복사</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <p id="translation-status" class="translation-status" aria-live="polite"></p>
-          <article id="translation-output" class="translation-output"></article>
+          <div class="translation-composer-area">
+            <div class="translation-composer-row">
+              <button id="translate-current-page" class="translation-composer" type="button">
+                <span id="translation-composer-label">페이지 1 번역하기</span>
+                <span class="translation-send" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="m6 12 6-6 6 6M12 6v12" /></svg>
+                </span>
+              </button>
+              <button
+                id="open-translation-settings"
+                class="icon-button translation-bottom-button translation-settings-button"
+                type="button"
+                aria-label="번역 AI 설정"
+                aria-controls="translation-settings-popover"
+                aria-expanded="false"
+                title="번역 AI 설정"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 15.3a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6Z M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"
+                  />
+                </svg>
+              </button>
+              <button
+                id="close-translation-panel"
+                class="icon-button translation-bottom-button translation-close"
+                type="button"
+                aria-label="번역 패널 닫기"
+                title="닫기"
+              >
+                ×
+              </button>
+            </div>
+            <p id="translation-active-model">Gemini · Gemini 3.8 Flash</p>
+          </div>
         </section>
       </aside>
     </div>

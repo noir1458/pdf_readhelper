@@ -1,6 +1,6 @@
 # PDF Read Helper
 
-A private, local-first Chrome extension for reading, copying, extracting, and optionally translating PDF pages. PDF files stay local; an image of the current page is sent to OpenAI only when the user explicitly requests a translation.
+A private, local-first Chrome extension for reading, copying, extracting, and optionally translating PDF pages. PDF files stay local; an image of the current page is sent to the selected Gemini or OpenAI API only when the user explicitly requests a translation.
 
 ## What it does
 
@@ -32,8 +32,8 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
 - Local pixel-based margin detection, safe content cropping, and 70% output resampling
 - PNG clipboard write with automatic download fallback
-- Right-side Korean translation panel using the OpenAI Responses API
-- Session-memory-only API key and local page translation cache
+- Translucent right-side Korean translation overlay with provider-specific model selection for Gemini and OpenAI
+- Provider-specific session-memory-only API keys and local page translation cache
 - Original PDF page-object extraction, such as `2-11.pdf`
 - Keyboard shortcuts
 - No remote code, analytics, persistent API-key storage, or backend
@@ -93,7 +93,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Move to the 14px strip along the left edge below the toolbar to reveal the document sidebar; move away to hide it again. Keyboard users can Tab to the invisible edge control to reveal it. Its controls always begin below the expanded-toolbar height, so revealing the top bar never shifts sidebar content vertically.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
-- Use the horizontal-arrow button to fit page width, the vertical-arrow button to fit page height, or the corner-marked page button to fit the locally detected content inside both dimensions. Content Fit preserves all detected content, centers it in the viewport, and falls back to fitting the complete page when margins are uncertain. In page-turn mode, the active Fit mode recalculates after the viewer area changes, such as a window resize or opening/closing the translation panel.
+- Use the horizontal-arrow button to fit page width, the vertical-arrow button to fit page height, or the corner-marked page button to fit the locally detected content inside both dimensions. Content Fit preserves all detected content, centers it in the viewport, and falls back to fitting the complete page when margins are uncertain. In page-turn mode, the active Fit mode recalculates after the viewer area changes, such as a window resize.
 - Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, print, and shortcut-help controls. Choose **? Shortcuts** for an in-viewer reference of every supported key. The panels close with their × button, Escape, or a click elsewhere. Ctrl/Command+F opens More and its search field automatically.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
@@ -138,13 +138,13 @@ Browser tabs, scrollbars, and extension controls are not captured. If the clipbo
 ### Translate the current page
 
 1. Click **AI / Translate** in the top toolbar.
-2. Enter your own OpenAI API key. It remains only in this viewer tab's memory and is forgotten when the tab closes.
-3. Click **Translate page**. The locally cropped/resampled current-page PNG is sent to `gpt-5.6-luna` with `detail: high` and `store: false`.
+2. Open the gear menu, select **Gemini** or **OpenAI**, choose a model, then enter that provider's API key. Each key remains only in this viewer tab's memory and is forgotten when the tab closes.
+3. Use the bottom translation action. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
 4. Read the Korean result in the right panel or copy it as text.
 
-Opening the panel or scrolling never sends a request. Results are cached locally by PDF and page, so revisiting a translated page does not incur another request. **Translate again** makes a new billed request and replaces that page's cached result.
+Opening the panel, switching providers/models, or scrolling never sends a request. Results are cached locally by provider, model, PDF, and page, so revisiting a translated page does not incur another request. **Translate again** makes a new billed request and replaces that provider/model's cached result. Request errors remain in the result conversation with retry and settings actions instead of disappearing with a toast.
 
-OpenAI's production guidance says API keys should not be exposed in browsers or apps. This direct session-only flow is intended solely for the owner's private unpacked extension. Do not use it in a distributed build; introduce a server-side proxy or short-lived credential flow first. Use a dedicated project key with an appropriate spending limit.
+Direct browser-held API keys are intended solely for the owner's private unpacked extension. Do not use this design in a distributed build; introduce a server-side proxy or short-lived credential flow first. Use dedicated provider projects and appropriate spending limits.
 
 ### Extract `2-11.pdf`
 
@@ -196,7 +196,7 @@ Chrome controls this setting; the extension cannot enable it automatically.
 - IndexedDB-backed saved-document metadata, PDF bytes, cover thumbnail, last-read page, and view state
 - LocalStorage-backed reading theme and continuous/page-turn flow preferences
 - Separate IndexedDB translation cache containing returned text and token counts, never API keys or page images
-- Direct Responses API client for explicitly requested current-page translation
+- Small translation-provider boundary with direct Gemini GenerateContent and OpenAI Responses API clients
 - Service worker limited to keyboard-command routing
 - Typed message contracts in `src/shared/messages.ts`
 - Lazy rendering with bounded canvas release
@@ -210,18 +210,18 @@ For complete architecture, security policy, decisions, and current status, see [
 - `downloads`: save extracted PDFs and fallback PNGs
 - `commands`: keyboard shortcuts
 - `clipboardWrite`: write PNG after asynchronous page rendering
-- `http://*/*`, `https://*/*`, `file:///*`: fetch a user-chosen PDF URL and call `api.openai.com` after an explicit translation request
+- `http://*/*`, `https://*/*`, `file:///*`: fetch a user-chosen PDF URL and call the selected Gemini or OpenAI API after an explicit translation request
 
 There are no always-on content scripts and no passive browsing collection.
 
 ## Privacy
 
 - PDF processing happens in the browser.
-- Original PDF bytes are not uploaded. A prepared image of one page is uploaded to OpenAI only when Translate is clicked.
+- Original PDF bytes are not uploaded. A prepared image of one page is uploaded to the selected Gemini or OpenAI API only when Translate is clicked.
 - Saved PDF copies and reading positions stay in the extension's local IndexedDB.
 - Returned translations and token counts stay in a separate local IndexedDB cache.
 - No analytics or telemetry.
-- The OpenAI API key stays only in the current viewer tab's memory and is not persisted.
+- Gemini and OpenAI API keys stay only in the current viewer tab's memory and are not persisted.
 
 ## Known limitations
 
@@ -234,7 +234,7 @@ There are no always-on content scripts and no passive browsing collection.
 - PDF bookmarks/outlines and signatures are not guaranteed to survive range extraction.
 - Browser memory still limits extremely large documents/pages despite lazy rendering and pixel caps.
 - Saving many very large PDFs can exhaust Chrome's storage quota; remove unneeded entries from the saved-documents tab.
-- OpenAI translation requires a billed API key and an internet connection. Closing the viewer forgets the key.
+- Translation requires an eligible Gemini or OpenAI API key and an internet connection. Closing the viewer forgets both provider keys.
 - Direct API-key use is suitable only for this private unpacked copy, not a publicly distributed extension.
 
 ## Manual verification checklist
@@ -254,7 +254,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
-- [ ] Use Content Fit on text-heavy, colored-cover, blank, rotated, and mixed-size pages; resize the window and toggle the translation panel in page-turn mode, then confirm useful content stays consistently centered and uncertain margins fall back to the full page
+- [ ] Use Content Fit on text-heavy, colored-cover, blank, rotated, and mixed-size pages; resize the window and open/close the overlaid translation panel in page-turn mode, then confirm useful content stays consistently centered, the panel does not change Fit, and uncertain margins fall back to the full page
 - [ ] Open More, use a direct action, Escape, and outside click; verify it closes correctly and that theme/search sub-popovers remain usable
 - [ ] Open More → Shortcuts; verify the reference remains visible after More closes and closes with ×, Escape, and an outside click
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
@@ -274,9 +274,12 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Confirm normal white-page margins are cropped without cutting headers, footers, or page numbers
 - [ ] Confirm colored covers, blank pages, scanned pages, and dark pages use safe bounds
 - [ ] Open and close the translation panel and confirm that scrolling alone does not send requests
-- [ ] Translate one page with a low-limit test API key and verify Korean output and token counts
-- [ ] Revisit that page and confirm its cached translation loads without another request
-- [ ] Use **Translate again**, **Copy translation**, **Change key**, Escape, and the panel close button
+- [ ] Confirm the translucent translation overlay leaves the original page visible underneath, does not resize the PDF, keeps response text readable over white/dark pages, and keeps Translate, Settings, and Close together at the bottom
+- [ ] Translate one page with each provider/model option and verify Korean output and token counts
+- [ ] Switch providers and models, then revisit that page; confirm each provider/model cache loads without another request
+- [ ] Open/close the gear settings with its button, Escape, and an outside click; switch provider/model, replace/delete each key, and confirm the main conversation stays usable
+- [ ] Use **Translate again**, **Copy translation**, inline **Retry**, inline **Check settings**, Escape, and the panel close button
+- [ ] Trigger a temporary Gemini failure and confirm the full error remains in the translation result instead of appearing only as a toast
 - [ ] Trigger a denied clipboard and confirm PNG fallback download
 - [ ] Extract `2-11` and confirm exactly ten vector/text pages
 - [ ] Open a public PDF URL from the on-demand URL popover
@@ -300,7 +303,7 @@ Keep the reader tab focused and click IMG again. Chrome may deny clipboard acces
 
 ### Translation fails
 
-Confirm the API key belongs to an active OpenAI project with available billing/spend limit, then try again. A 401 message indicates a rejected key; a 429 message usually indicates a rate or spending limit. Closing the viewer tab clears the key, so enter it again after reopening.
+Confirm the selected provider matches the entered key and that its project has API access plus available billing/quota. A rejected-key message usually indicates a wrong, disabled, or differently scoped project key; a 429 response indicates a rate, quota, or spending limit. A 503 high-demand response is temporary: retry later or choose the other configured Gemini model from the gear menu. The complete error and recovery actions remain in the translation result. Closing the viewer tab clears both provider keys, so enter them again after reopening.
 
 ### Local file cannot open
 

@@ -30,11 +30,12 @@ describe("OpenAI translation responses", () => {
 });
 
 describe("translation cache keys", () => {
-  it("separates documents, pages, and models", () => {
-    const key = translationCacheKey("document-a", 17, "gpt-5.6-luna");
+  it("separates providers, documents, pages, and models", () => {
+    const key = translationCacheKey("document-a", 17, "openai", "gpt-5.6-luna");
     expect(key).toContain("document-a:17");
-    expect(key).not.toBe(translationCacheKey("document-a", 18, "gpt-5.6-luna"));
-    expect(key).not.toBe(translationCacheKey("document-b", 17, "gpt-5.6-luna"));
-    expect(key).not.toBe(translationCacheKey("document-a", 17, "gpt-5.6-terra"));
+    expect(key).not.toBe(translationCacheKey("document-a", 17, "gemini", "gpt-5.6-luna"));
+    expect(key).not.toBe(translationCacheKey("document-a", 18, "openai", "gpt-5.6-luna"));
+    expect(key).not.toBe(translationCacheKey("document-b", 17, "openai", "gpt-5.6-luna"));
+    expect(key).not.toBe(translationCacheKey("document-a", 17, "openai", "gpt-5.6-terra"));
   });
 });
