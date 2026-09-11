@@ -2,7 +2,7 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 
 export type ViewRotation = 0 | 90 | 180 | 270;
 export type PageLayout = "single" | "spread";
-export type ZoomMode = "manual" | "fit-width" | "fit-height";
+export type ZoomMode = "manual" | "fit-width" | "fit-height" | "fit-content";
 
 export type PdfSource =
   | { kind: "local-file"; name: string }

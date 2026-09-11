@@ -32,6 +32,17 @@ describe("saved document view state", () => {
     });
   });
 
+  it("retains content-fit intent for reopening", () => {
+    expect(
+      normalizeSavedDocumentView({
+        zoom: 1.5,
+        zoomMode: "fit-content",
+        rotation: 0,
+        pageLayout: "single",
+      }).zoomMode,
+    ).toBe("fit-content");
+  });
+
   it("replaces malformed or unsafe values independently", () => {
     expect(
       normalizeSavedDocumentView({

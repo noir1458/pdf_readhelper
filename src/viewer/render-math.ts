@@ -1,7 +1,7 @@
 import type { PageLayout, ViewRotation } from "../shared/types";
 
 export type Dimensions = { width: number; height: number };
-export type FitMode = "width" | "height";
+export type FitMode = "width" | "height" | "content";
 
 export function normalizeRotation(value: number): ViewRotation {
   const normalized = (((Math.round(value / 90) * 90) % 360) + 360) % 360;
@@ -49,6 +49,12 @@ export function fittedScale(
   availableHeight: number,
   mode: FitMode,
 ): number {
+  if (mode === "content") {
+    if (pageWidth <= 0 || pageHeight <= 0 || availableWidth <= 0 || availableHeight <= 0) {
+      return 1;
+    }
+    return Math.min(availableWidth / pageWidth, availableHeight / pageHeight);
+  }
   const pageLength = mode === "width" ? pageWidth : pageHeight;
   const availableLength = mode === "width" ? availableWidth : availableHeight;
   if (pageLength <= 0 || availableLength <= 0) return 1;

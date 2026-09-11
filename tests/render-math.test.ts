@@ -21,6 +21,7 @@ describe("render sizing", () => {
   it("fits a page to the requested viewport dimension", () => {
     expect(fittedScale(600, 800, 900, 700, "width")).toBe(1.5);
     expect(fittedScale(600, 800, 900, 700, "height")).toBe(0.875);
+    expect(fittedScale(600, 800, 900, 700, "content")).toBe(0.875);
   });
 
   it("falls back safely for invalid fit dimensions", () => {

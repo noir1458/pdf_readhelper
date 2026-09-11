@@ -22,6 +22,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Clickable PDF links with internal-page navigation and safe external-tab opening
 - Original PDF download and print handoff without rerendering every page
 - Animated auto-compacting top toolbar that leaves page actions and the page counter fixed in place
+- AI-free content Fit that detects page margins locally and centers the useful page area
 - Focus/fullscreen reading mode that temporarily hides all viewer chrome
 - Edge-revealed left sidebar with lazy page thumbnails and PDF table-of-contents navigation
 - Full-width sidebar overlay that slides in from the left without reducing the document width
@@ -92,7 +93,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 - Move away from the full top toolbar to compact it. IMG, PDF, AI, and the current/total page field remain translucently in their original toolbar positions while the other controls slide upward. Move into the 14px strip at the very top edge of the window to reveal the full toolbar again.
 - Move to the 14px strip along the left edge below the toolbar to reveal the document sidebar; move away to hide it again. Keyboard users can Tab to the invisible edge control to reveal it. Its controls always begin below the expanded-toolbar height, so revealing the top bar never shifts sidebar content vertically.
 - Switch the sidebar between page thumbnails and the PDF's embedded table of contents. PDFs without an outline show an empty state.
-- Use the horizontal-arrow button to fit page width and the vertical-arrow button to fit the current page's height.
+- Use the horizontal-arrow button to fit page width, the vertical-arrow button to fit page height, or the corner-marked page button to fit the locally detected content inside both dimensions. Content Fit preserves all detected content, centers it in the viewport, and falls back to fitting the complete page when margins are uncertain.
 - Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, print, and shortcut-help controls. Choose **? Shortcuts** for an in-viewer reference of every supported key. The panels close with their × button, Escape, or a click elsewhere. Ctrl/Command+F opens More and its search field automatically.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
 - Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
@@ -253,6 +254,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Close the range popover using `×`, `Esc`, and an outside click
 - [ ] Open and close the URL popover using its button, `×`, `Esc`, and an outside click
 - [ ] Zoom, fit width, and fit height
+- [ ] Use Content Fit on text-heavy, colored-cover, blank, rotated, and mixed-size pages; confirm useful content is centered and uncertain margins fall back to the full page
 - [ ] Open More, use a direct action, Escape, and outside click; verify it closes correctly and that theme/search sub-popovers remain usable
 - [ ] Open More → Shortcuts; verify the reference remains visible after More closes and closes with ×, Escape, and an outside click
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned

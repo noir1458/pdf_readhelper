@@ -162,7 +162,10 @@ export function normalizeSavedDocumentView(value: unknown): SavedDocumentView {
         ? zoom
         : DEFAULT_VIEW_SCALE,
     zoomMode:
-      zoomMode === "fit-width" || zoomMode === "fit-height" || zoomMode === "manual"
+      zoomMode === "fit-width" ||
+      zoomMode === "fit-height" ||
+      zoomMode === "fit-content" ||
+      zoomMode === "manual"
         ? zoomMode
         : "manual",
     rotation:

@@ -1,13 +1,13 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import {
   DEFAULT_EXPORT_SCALE,
-  EXPORT_ANALYSIS_MAX_DIMENSION,
   EXPORT_OUTPUT_SCALE_RATIO,
   MAX_EXPORT_PIXELS,
 } from "../shared/constants";
 import { UserFacingError } from "../shared/errors";
 import type { ViewRotation } from "../shared/types";
-import { detectContentBounds, scaleBounds } from "./content-bounds";
+import { scaleBounds } from "./content-bounds";
+import { measurePageContent } from "./page-content-bounds";
 import { canvasDimensions, limitedScale, normalizeRotation } from "./render-math";
 
 type PagePngOptions = {
@@ -33,24 +33,11 @@ export async function renderPagePng(
   const page = await document.getPage(pageNumber);
   const rotation = normalizeRotation(page.rotate + viewRotation);
   const base = page.getViewport({ scale: 1, rotation });
-  const analysisScale = Math.min(
-    1,
-    EXPORT_ANALYSIS_MAX_DIMENSION / Math.max(base.width, base.height),
-  );
-  const analysisViewport = page.getViewport({ scale: analysisScale, rotation });
-  const analysisDimensions = canvasDimensions(base.width, base.height, analysisScale);
-  const analysisCanvas = documentOwnerCanvas();
   const sourceCanvas = documentOwnerCanvas();
   const outputCanvas = documentOwnerCanvas();
 
   try {
-    analysisCanvas.width = analysisDimensions.width;
-    analysisCanvas.height = analysisDimensions.height;
-    const analysisContext = canvasContext(analysisCanvas);
-    await page.render({ canvas: analysisCanvas, viewport: analysisViewport }).promise;
-    const detectedBounds = detectContentBounds(
-      analysisContext.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height),
-    );
+    const measurement = await measurePageContent(page, viewRotation);
 
     const scale = limitedScale(base.width, base.height, requestedScale, MAX_EXPORT_PIXELS);
     const viewport = page.getViewport({ scale, rotation });
@@ -61,9 +48,9 @@ export async function renderPagePng(
     await page.render({ canvas: sourceCanvas, viewport }).promise;
 
     const crop = scaleBounds(
-      detectedBounds,
-      analysisCanvas.width,
-      analysisCanvas.height,
+      measurement.bounds,
+      measurement.analysisWidth,
+      measurement.analysisHeight,
       sourceCanvas.width,
       sourceCanvas.height,
     );
@@ -85,8 +72,6 @@ export async function renderPagePng(
     );
     return await canvasToBlob(outputCanvas);
   } finally {
-    analysisCanvas.width = 0;
-    analysisCanvas.height = 0;
     sourceCanvas.width = 0;
     sourceCanvas.height = 0;
     outputCanvas.width = 0;

@@ -61,6 +61,12 @@ import {
 } from "./document-library";
 import { loadLocalFile, loadPdfUrl } from "./pdf-loader";
 import { renderPagePng } from "./page-exporter";
+import {
+  contentFittedScale,
+  measurePageContent,
+  pageContentBox,
+  type PageContentMeasurement,
+} from "./page-content-bounds";
 import { PageRenderer } from "./page-renderer";
 import { PageTracker } from "./page-tracker";
 import { destinationPageNumber } from "./pdf-destination";
@@ -95,6 +101,7 @@ const topbar = requireElement<HTMLElement>(".topbar");
 const topbarRevealZone = requireElement<HTMLElement>("#topbar-reveal-zone");
 const sidebar = requireElement<HTMLElement>("#document-sidebar");
 const sidebarRevealZone = requireElement<HTMLButtonElement>("#sidebar-reveal-zone");
+const contentFitButton = requireElement<HTMLButtonElement>("#fit-content");
 const rotateButton = requireElement<HTMLButtonElement>("#rotate-clockwise");
 const pageLayoutButton = requireElement<HTMLButtonElement>("#toggle-page-layout");
 const pageFlowButton = requireElement<HTMLButtonElement>("#toggle-page-flow");
@@ -128,6 +135,7 @@ let positionSaveTimer = 0;
 let translationRequestController: AbortController | null = null;
 let topbarCollapseTimer = 0;
 let sidebarCollapseTimer = 0;
+let fitRequestGeneration = 0;
 let searchTimer = 0;
 let documentSearch: PdfDocumentSearch | null = null;
 let searchController: AbortController | null = null;
@@ -137,6 +145,7 @@ let currentBookmarks = new Map<number, PageBookmark>();
 let bookmarkBusy = false;
 let pageFlow: PageFlow = readPageFlow();
 let pagedVisiblePages = new Set<number>();
+const contentMeasurements = new Map<string, Promise<PageContentMeasurement>>();
 
 const documentSidebar = new DocumentSidebar(
   {
@@ -240,6 +249,7 @@ requireElement<HTMLButtonElement>("#fit-height").addEventListener(
   "click",
   () => void fitPage("height"),
 );
+contentFitButton.addEventListener("click", () => void fitPage("content", true));
 rotateButton.addEventListener("click", rotateClockwise);
 pageLayoutButton.addEventListener("click", togglePageLayout);
 pageFlowButton.addEventListener("click", togglePageFlow);
@@ -520,6 +530,8 @@ async function openBytes(
   renderObserver?.disconnect();
   tracker.disconnect();
   documentSidebar.destroy();
+  fitRequestGeneration += 1;
+  contentMeasurements.clear();
   setSidebarAvailable(false);
   focusMode.setAvailable(false);
   pageFlowButton.disabled = true;
@@ -581,6 +593,13 @@ async function openBytes(
     source.kind === "local-file" ? `${source.name} — PDF Read Helper` : "PDF Read Helper";
   if (initialPage > 1) navigateToPage(initialPage, "auto", false);
   await renderNear(initialPage);
+  if (session.snapshot.zoomMode === "fit-content") {
+    try {
+      await centerFittedContent(initialPage, await contentMeasurementForPage(initialPage));
+    } catch {
+      // The restored scale remains usable when content centering cannot be restored.
+    }
+  }
   if (options.persistBytes === false) {
     void saveReadingPositionNow().then(refreshDocumentLibrary).catch(reportLibraryError);
   } else {
@@ -698,6 +717,9 @@ function navigateToPage(
   slot.element.scrollIntoView({ behavior, block: "start" });
   if (pageFlow !== "paged") updateCurrentPage(target);
   void renderNear(target);
+  if (pageFlow === "paged" && session.snapshot.zoomMode === "fit-content") {
+    void fitPage("content");
+  }
   return true;
 }
 
@@ -1129,6 +1151,7 @@ function reportLibraryError(): void {
 
 function setZoom(value: number, mode: ZoomMode = "manual"): void {
   if (!renderer) return;
+  if (mode === "manual") fitRequestGeneration += 1;
   const zoom = clampViewZoom(value);
   session.setZoom(zoom, mode);
   renderer.setZoom(zoom);
@@ -1140,44 +1163,122 @@ function clampViewZoom(value: number): number {
   return Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, value));
 }
 
-async function fitPage(mode: FitMode): Promise<void> {
-  if (!renderer) return;
+async function fitPage(mode: FitMode, announceFallback = false): Promise<void> {
+  const requestGeneration = ++fitRequestGeneration;
+  const activeRenderer = renderer;
+  const activeDocument = session.snapshot.document;
+  if (!activeRenderer || !activeDocument) return;
+  const pageNumber = session.snapshot.currentPage;
   try {
-    const scale = await fittedZoomForPage(mode, session.snapshot.currentPage);
-    setZoom(scale, mode === "width" ? "fit-width" : "fit-height");
+    const measurement = mode === "content" ? await contentMeasurementForPage(pageNumber) : null;
+    const scale = await fittedZoomForPage(mode, pageNumber, measurement);
+    if (
+      renderer !== activeRenderer ||
+      session.snapshot.document !== activeDocument ||
+      session.snapshot.currentPage !== pageNumber ||
+      fitRequestGeneration !== requestGeneration
+    ) {
+      return;
+    }
+    const zoomMode: ZoomMode =
+      mode === "width" ? "fit-width" : mode === "height" ? "fit-height" : "fit-content";
+    setZoom(scale, zoomMode);
+    if (measurement) {
+      await centerFittedContent(pageNumber, measurement, requestGeneration);
+      if (announceFallback && measurement.usesFullPage) {
+        toast.show("Margins were uncertain, so the full page was fitted.");
+      }
+    }
   } catch (error) {
     toast.show(`Could not fit page: ${errorMessage(error)}`, "error");
   }
 }
 
-async function fittedZoomForPage(mode: FitMode, pageNumber: number): Promise<number> {
-  const page = await session.requireDocument().getPage(pageNumber);
-  const viewport = page.getViewport({
-    scale: 1,
-    rotation: normalizeRotation(page.rotate + session.snapshot.rotation),
-  });
+async function fittedZoomForPage(
+  mode: FitMode,
+  pageNumber: number,
+  existingMeasurement: PageContentMeasurement | null = null,
+): Promise<number> {
   const horizontalMargin = window.innerWidth <= 760 ? 24 : 56;
   const availableWidth = pageWidthForLayout(
     Math.max(120, scroller.clientWidth - horizontalMargin),
     session.snapshot.pageLayout,
   );
-  return fittedScale(
-    viewport.width,
-    viewport.height,
-    availableWidth,
-    Math.max(120, scroller.clientHeight - 48),
-    mode,
-  );
+  const availableHeight = Math.max(120, scroller.clientHeight - 48);
+  if (mode === "content") {
+    const measurement = existingMeasurement ?? (await contentMeasurementForPage(pageNumber));
+    return contentFittedScale(measurement, availableWidth, availableHeight);
+  }
+  const page = await session.requireDocument().getPage(pageNumber);
+  const viewport = page.getViewport({
+    scale: 1,
+    rotation: normalizeRotation(page.rotate + session.snapshot.rotation),
+  });
+  return fittedScale(viewport.width, viewport.height, availableWidth, availableHeight, mode);
+}
+
+function contentMeasurementForPage(pageNumber: number): Promise<PageContentMeasurement> {
+  const document = session.requireDocument();
+  const rotation = session.snapshot.rotation;
+  const key = `${rotation}:${pageNumber}`;
+  const existing = contentMeasurements.get(key);
+  if (existing) return existing;
+  const pending = document
+    .getPage(pageNumber)
+    .then((page) => measurePageContent(page, rotation))
+    .then((measurement) => {
+      if (session.snapshot.document !== document) throw new Error("The PDF changed.");
+      return measurement;
+    })
+    .catch((error: unknown) => {
+      contentMeasurements.delete(key);
+      throw error;
+    });
+  contentMeasurements.set(key, pending);
+  return pending;
+}
+
+async function centerFittedContent(
+  pageNumber: number,
+  measurement: PageContentMeasurement,
+  requestGeneration?: number,
+): Promise<void> {
+  const activeRenderer = renderer;
+  const slot = slots.get(pageNumber);
+  if (!activeRenderer || !slot) return;
+  await activeRenderer.render(pageNumber);
+  if (
+    renderer !== activeRenderer ||
+    session.snapshot.currentPage !== pageNumber ||
+    (requestGeneration !== undefined && fitRequestGeneration !== requestGeneration)
+  ) {
+    return;
+  }
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  if (requestGeneration !== undefined && fitRequestGeneration !== requestGeneration) return;
+  const slotRect = slot.element.getBoundingClientRect();
+  const scrollerRect = scroller.getBoundingClientRect();
+  const bounds = pageContentBox(measurement);
+  const zoom = session.snapshot.zoom;
+  const contentCenterX = slotRect.left + (bounds.x + bounds.width / 2) * zoom;
+  const contentCenterY = slotRect.top + (bounds.y + bounds.height / 2) * zoom;
+  scroller.scrollBy({
+    left: contentCenterX - (scrollerRect.left + scroller.clientWidth / 2),
+    top: contentCenterY - (scrollerRect.top + scroller.clientHeight / 2),
+    behavior: "auto",
+  });
 }
 
 function fitModeFromZoomMode(mode: ZoomMode): FitMode | null {
   if (mode === "fit-width") return "width";
   if (mode === "fit-height") return "height";
+  if (mode === "fit-content") return "content";
   return null;
 }
 
 function rotateClockwise(): void {
   if (!renderer) return;
+  fitRequestGeneration += 1;
   const rotation = nextRotation(session.snapshot.rotation);
   const pageNumber = session.snapshot.currentPage;
   session.setRotation(rotation);
@@ -1186,9 +1287,11 @@ function rotateClockwise(): void {
   const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
   const rerender = fitMode ? fitPage(fitMode) : renderNear(pageNumber);
   scheduleViewStateSave();
-  void rerender.then(() => {
-    slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
-  });
+  if (fitMode !== "content") {
+    void rerender.then(() => {
+      slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }
   toast.show(`Rotated to ${rotation}°`, "success");
 }
 
@@ -1200,26 +1303,34 @@ function updateRotationButton(): void {
 
 function togglePageLayout(): void {
   if (!renderer) return;
+  fitRequestGeneration += 1;
   const pageNumber = session.snapshot.currentPage;
   session.setPageLayout(session.snapshot.pageLayout === "single" ? "spread" : "single");
   updatePageLayout();
   const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
   if (fitMode) void fitPage(fitMode);
   scheduleViewStateSave();
-  window.requestAnimationFrame(() => {
-    slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
-  });
+  if (fitMode !== "content") {
+    window.requestAnimationFrame(() => {
+      slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }
   toast.show(session.snapshot.pageLayout === "spread" ? "Two-page spread" : "Single-page layout");
 }
 
 function togglePageFlow(): void {
+  fitRequestGeneration += 1;
   pageFlow = pageFlow === "continuous" ? "paged" : "continuous";
   writePageFlow(pageFlow);
   applyPageFlow();
   const pageNumber = session.snapshot.currentPage;
-  window.requestAnimationFrame(() => {
-    slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
-  });
+  const fitMode = fitModeFromZoomMode(session.snapshot.zoomMode);
+  if (fitMode === "content") void fitPage("content");
+  else {
+    window.requestAnimationFrame(() => {
+      slots.get(pageNumber)?.element.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }
   if (session.snapshot.document) void renderNear(pageNumber);
   toast.show(pageFlow === "paged" ? "Page-turn mode" : "Continuous scrolling");
 }
