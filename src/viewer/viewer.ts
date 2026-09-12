@@ -288,7 +288,9 @@ historyBackButton.addEventListener("click", () => navigatePageHistory("back"));
 historyForwardButton.addEventListener("click", () => navigatePageHistory("forward"));
 pageInput.addEventListener("change", navigateFromInput);
 pageInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") navigateFromInput();
+  if (event.key !== "Enter") return;
+  navigateFromInput();
+  pageInput.blur();
 });
 searchButton.addEventListener("click", toggleSearch);
 requireElement<HTMLButtonElement>("#close-search").addEventListener("click", closeSearch);

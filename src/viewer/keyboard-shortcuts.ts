@@ -4,6 +4,7 @@ type CopyShortcutEvent = Pick<
 >;
 
 type ReadingNavigationEvent = CopyShortcutEvent;
+type TranslationShortcutEvent = CopyShortcutEvent & Pick<KeyboardEvent, "code">;
 
 export type ReadingNavigationAction =
   "viewport-forward" | "viewport-backward" | "document-start" | "document-end";
@@ -94,7 +95,7 @@ export function focusModeShortcutAction(
 }
 
 export function translationShortcutAction(
-  event: CopyShortcutEvent,
+  event: TranslationShortcutEvent,
 ): TranslationShortcutAction | null {
   if (
     event.defaultPrevented ||
@@ -102,7 +103,7 @@ export function translationShortcutAction(
     event.altKey ||
     event.ctrlKey ||
     event.metaKey ||
-    event.key.toLowerCase() !== "t"
+    (event.code !== "KeyT" && event.key.toLowerCase() !== "t")
   ) {
     return null;
   }

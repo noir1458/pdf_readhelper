@@ -8,8 +8,9 @@ import {
   translationShortcutAction,
 } from "../src/viewer/keyboard-shortcuts";
 
-const event = (overrides: Partial<Parameters<typeof isPageCopyShortcut>[0]> = {}) => ({
+const event = (overrides: Partial<Parameters<typeof translationShortcutAction>[0]> = {}) => ({
   altKey: false,
+  code: "KeyC",
   ctrlKey: false,
   defaultPrevented: false,
   key: "c",
@@ -101,15 +102,20 @@ describe("focus mode shortcut", () => {
 
 describe("translation shortcuts", () => {
   it("maps T to panel toggle and Shift+T to translation", () => {
-    expect(translationShortcutAction(event({ key: "t" }))).toBe("toggle-panel");
-    expect(translationShortcutAction(event({ key: "T" }))).toBe("toggle-panel");
-    expect(translationShortcutAction(event({ key: "t", shiftKey: true }))).toBe("translate");
+    expect(translationShortcutAction(event({ code: "KeyT", key: "t" }))).toBe("toggle-panel");
+    expect(translationShortcutAction(event({ code: "KeyT", key: "T" }))).toBe("toggle-panel");
+    expect(translationShortcutAction(event({ code: "KeyT", key: "ㅅ" }))).toBe("toggle-panel");
+    expect(translationShortcutAction(event({ code: "KeyT", key: "t", shiftKey: true }))).toBe(
+      "translate",
+    );
   });
 
   it("preserves modified, repeated, and already handled keys", () => {
-    expect(translationShortcutAction(event({ key: "t", ctrlKey: true }))).toBeNull();
-    expect(translationShortcutAction(event({ key: "t", altKey: true }))).toBeNull();
-    expect(translationShortcutAction(event({ key: "t", repeat: true }))).toBeNull();
-    expect(translationShortcutAction(event({ key: "t", defaultPrevented: true }))).toBeNull();
+    expect(translationShortcutAction(event({ code: "KeyT", key: "t", ctrlKey: true }))).toBeNull();
+    expect(translationShortcutAction(event({ code: "KeyT", key: "t", altKey: true }))).toBeNull();
+    expect(translationShortcutAction(event({ code: "KeyT", key: "t", repeat: true }))).toBeNull();
+    expect(
+      translationShortcutAction(event({ code: "KeyT", key: "t", defaultPrevented: true })),
+    ).toBeNull();
   });
 });
