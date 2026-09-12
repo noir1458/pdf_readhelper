@@ -66,6 +66,20 @@ export class TranslationCache {
     return record;
   }
 
+  async listDocument(documentId: string): Promise<CachedPageTranslation[]> {
+    const database = await this.#database();
+    const transaction = database.transaction(TRANSLATION_STORE, "readonly");
+    const index = transaction.objectStore(TRANSLATION_STORE).index(DOCUMENT_INDEX);
+    const values = await requestResult<unknown[]>(index.getAll(IDBKeyRange.only(documentId)));
+    await transactionDone(transaction);
+    return values
+      .flatMap((value) => {
+        const translation = cachedPageTranslation(value);
+        return translation ? [translation] : [];
+      })
+      .sort((left, right) => left.pageNumber - right.pageNumber);
+  }
+
   async removeDocument(documentId: string): Promise<void> {
     const database = await this.#database();
     const transaction = database.transaction(TRANSLATION_STORE, "readwrite");
@@ -105,10 +119,7 @@ export class TranslationCache {
   }
 }
 
-export function translationCacheKey(
-  documentId: string,
-  pageNumber: number,
-): string {
+export function translationCacheKey(documentId: string, pageNumber: number): string {
   return `${CAPTURE_VERSION}:latest:${documentId}:${pageNumber}`;
 }
 
@@ -153,9 +164,7 @@ function cachedPageTranslation(value: unknown): CachedPageTranslation | null {
   }
   const providerId: TranslationProviderId = value.providerId === "gemini" ? "gemini" : "openai";
   const targetLanguage =
-    typeof value.targetLanguage === "string"
-      ? value.targetLanguage
-      : DEFAULT_TRANSLATION_LANGUAGE;
+    typeof value.targetLanguage === "string" ? value.targetLanguage : DEFAULT_TRANSLATION_LANGUAGE;
   const usage: TranslationUsage = {};
   if (isRecord(value.usage)) {
     const inputTokens = finiteNumber(value.usage.inputTokens);

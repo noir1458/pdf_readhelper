@@ -6,6 +6,8 @@ import {
 } from "../src/translation/gemini-translation";
 import { translationModel, translationProvider } from "../src/translation/translation-providers";
 
+const TEST_API_KEY = "unit-test-api-key-not-a-real-secret";
+
 describe("Gemini translation responses", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -70,7 +72,7 @@ describe("Gemini translation responses", () => {
 
     const result = await translatePageImage(
       "gemini-3.8-flash",
-      "AIza-test-key-long-enough-for-unit-test",
+      TEST_API_KEY,
       new Blob(["png"], { type: "image/png" }),
       7,
       "Japanese (ja)",
@@ -82,7 +84,7 @@ describe("Gemini translation responses", () => {
     expect(url).toContain("/models/gemini-3.8-flash:generateContent");
     expect(options.headers).toMatchObject({
       "Content-Type": "application/json",
-      "x-goog-api-key": "AIza-test-key-long-enough-for-unit-test",
+      "x-goog-api-key": TEST_API_KEY,
     });
     if (typeof options.body !== "string") throw new Error("Expected a JSON request body");
     const body = JSON.parse(options.body) as {
@@ -117,7 +119,7 @@ describe("Gemini translation responses", () => {
     await expect(
       translatePageImage(
         "gemini-3.8-flash",
-        "AIza-test-key-long-enough-for-unit-test",
+        TEST_API_KEY,
         new Blob(["png"], { type: "image/png" }),
         1,
         "Korean (ko)",

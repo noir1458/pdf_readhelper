@@ -1,12 +1,18 @@
 import { writePngToClipboard } from "../clipboard/clipboard";
 import { downloadBlob } from "../shared/download";
 import { errorMessage, UserFacingError } from "../shared/errors";
-import { originalPdfFilename, pageImageFilename, rangeFilename } from "../shared/filename";
+import {
+  originalPdfFilename,
+  pageImageFilename,
+  rangeFilename,
+  translationTextFilename,
+} from "../shared/filename";
 import { isExtensionMessage } from "../shared/messages";
 import { classifyPdfUrl, sourceUrlFromLocation } from "../shared/source";
 import type { PageRange } from "../shared/range";
 import type { PageSlot, PdfSource, ZoomMode } from "../shared/types";
 import { TranslationCache, type CachedPageTranslation } from "../translation/translation-cache";
+import { formatTranslationExport } from "../translation/translation-export";
 import type { TranslationProviderId } from "../translation/translation-provider";
 import {
   DEFAULT_TRANSLATION_PROVIDER_ID,
@@ -31,6 +37,7 @@ import {
   originalDocumentShortcutAction,
   readingNavigationAction,
   readingScrollOffset,
+  translationShortcutAction,
 } from "./keyboard-shortcuts";
 import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
@@ -203,6 +210,8 @@ const translationPanel = new TranslationPanel(
       void loadCachedTranslations(pageNumbers, providerId, modelId, targetLanguage);
     },
     openChanged: (open) => toolbar.setTranslationOpen(open),
+    exportDocumentTranslations,
+    clearDocumentTranslations,
   },
 );
 
@@ -302,6 +311,7 @@ document.addEventListener("keydown", handlePageTurnShortcut);
 document.addEventListener("keydown", handlePageHistoryShortcut);
 document.addEventListener("keydown", handleFocusModeShortcut);
 document.addEventListener("keydown", handleOriginalDocumentShortcut);
+document.addEventListener("keydown", handleTranslationShortcut);
 topbar.addEventListener("pointerenter", () => window.clearTimeout(topbarCollapseTimer));
 topbar.addEventListener("pointerleave", scheduleTopbarCollapse);
 topbar.addEventListener("focusin", (event) => {
@@ -450,6 +460,25 @@ function handleOriginalDocumentShortcut(event: KeyboardEvent): void {
   else void printOriginal();
 }
 
+function handleTranslationShortcut(event: KeyboardEvent): void {
+  const action = translationShortcutAction(event);
+  if (
+    !session.snapshot.document ||
+    !action ||
+    focusMode.isActive ||
+    shouldKeepNativeTranslationShortcut(event.target)
+  ) {
+    return;
+  }
+  event.preventDefault();
+  if (action === "toggle-panel") {
+    toggleTranslationPanel();
+    return;
+  }
+  if (!translationPanel.isOpen) toggleTranslationPanel();
+  translationPanel.requestVisiblePages();
+}
+
 function shouldKeepNativeCopy(target: EventTarget | null): boolean {
   if (
     target instanceof Element &&
@@ -482,6 +511,13 @@ function shouldKeepNativePageHistoryShortcut(target: EventTarget | null): boolea
 }
 
 function shouldKeepNativeFocusShortcut(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element &&
+    target.closest('input, textarea, select, [contenteditable="true"]'),
+  );
+}
+
+function shouldKeepNativeTranslationShortcut(target: EventTarget | null): boolean {
   return Boolean(
     target instanceof Element &&
     target.closest('input, textarea, select, [contenteditable="true"]'),
@@ -742,11 +778,7 @@ function navigateFromInput(): void {
 }
 
 function translationViewPages(currentPage = session.snapshot.currentPage): number[] {
-  return pagedViewPages(
-    currentPage,
-    session.snapshot.totalPages,
-    session.snapshot.pageLayout,
-  );
+  return pagedViewPages(currentPage, session.snapshot.totalPages, session.snapshot.pageLayout);
 }
 
 function updatePageIndicator(pageNumbers = translationViewPages()): void {
@@ -764,7 +796,9 @@ function updatePageIndicator(pageNumbers = translationViewPages()): void {
 }
 
 function samePages(left: readonly number[], right: readonly number[]): boolean {
-  return left.length === right.length && left.every((pageNumber, index) => pageNumber === right[index]);
+  return (
+    left.length === right.length && left.every((pageNumber, index) => pageNumber === right[index])
+  );
 }
 
 function navigateToPage(
@@ -1710,6 +1744,28 @@ async function requestPageTranslation(
 function abortTranslationRequests(): void {
   for (const controller of translationRequestControllers.values()) controller.abort();
   translationRequestControllers.clear();
+}
+
+async function exportDocumentTranslations(): Promise<number> {
+  const documentId = activeDocumentId;
+  const source = session.snapshot.source;
+  if (!documentId || !source) throw new UserFacingError("내보낼 PDF가 열려 있지 않습니다.");
+  const translations = await translationCache.listDocument(documentId);
+  const text = formatTranslationExport(translations);
+  if (!text) throw new UserFacingError("내보낼 저장된 번역이 없습니다.");
+  await downloadBlob(
+    new Blob(["\uFEFF", text], { type: "text/plain;charset=utf-8" }),
+    translationTextFilename(source),
+  );
+  return translations.length;
+}
+
+async function clearDocumentTranslations(): Promise<number> {
+  const documentId = activeDocumentId;
+  if (!documentId) throw new UserFacingError("번역 캐시를 삭제할 PDF가 열려 있지 않습니다.");
+  const translations = await translationCache.listDocument(documentId);
+  await translationCache.removeDocument(documentId);
+  return translations.length;
 }
 
 async function copyPage(): Promise<void> {

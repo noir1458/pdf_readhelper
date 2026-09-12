@@ -111,7 +111,7 @@ pdf_readhelper/
 
 Responsibilities stay separated: loading/session state, visible rendering, page tracking, export rendering, extraction, clipboard, Chrome messaging, and UI components must not collapse into one large module.
 
-Gemini and OpenAI requests use the browser `fetch` API rather than bundling SDKs. A small provider contract isolates configured models, official key-page URLs, and request/response parsing; the translation panel owns provider/model/target-language selection, provider-specific session keys, opacity and AUTO state, and UI state; the cache owns persisted translation records; the viewer coordinates those modules with the active document.
+Gemini and OpenAI requests use the browser `fetch` API rather than bundling SDKs. A small provider contract isolates configured models, official key-page URLs, and request/response parsing; the translation panel owns provider/model/target-language selection, provider-specific session keys, opacity, width, font-size, and AUTO state plus file-level cache actions; the cache owns persisted translation records; the viewer coordinates those modules with the active document.
 
 ## 8. Chrome Permission Policy
 
@@ -216,7 +216,7 @@ The top bar keeps its opening actions on the left and one compact page-control g
 - Previous/next view buttons traverse explicit page jumps from thumbnails, outline entries, bookmarks, search results, PDF links, the page field, and Home/End. Continuous scrolling does not flood the history; the actual page visible when the reader next jumps replaces that departure point. Opening another PDF clears the history.
 - Focus mode requests browser fullscreen and hides the complete top toolbar, sidebar, and translation panel while retaining their underlying open state for restoration. F or Escape exits; failure to obtain browser fullscreen leaves the in-page distraction-free mode active with a toast explanation.
 - Page flow toggles between the existing continuous stack and a persisted page-turn presentation. Paged flow reveals only the active page in single layout or the active cover-first pair in spread layout, centers short pages safely, retains scrolling for oversized/zoomed pages, and shows translucent edge turn buttons. Returning to continuous flow unhides the existing slots without recreating the document.
-- AI opens a result-first translucent right overlay without narrowing the PDF viewport. Its main surface contains each cached result's page/provider/model/language/token provenance followed by the translation; a spread renders the left page first, a divider, then the right page. Persistent page-labelled errors and a more-transparent bottom row contain a compact Translate action, AUTO, three-state opacity, Settings, and Close; the panel does not repeat a header, request bubble, or AI badge. A gear popover contains provider/model selection, an editable target-language field, the provider's official API-key link, and key readiness/replacement/deletion. Opening the panel or changing settings never starts translation. AUTO is off by default and, while enabled, requests only visible pages without cached translations after a 650 ms settle delay. Manual spread translation requests both pages; independent controllers, cache keys, and result slots prevent cross-page overwrites, while copy joins both translations with page labels and a divider.
+- AI opens a result-first right overlay without narrowing the PDF viewport. Its main surface contains each cached result's page/provider/model/language/token provenance followed by the translation; a spread renders the left page first, a divider, then the right page. Persistent page-labelled errors and a compact bottom row contain Translate, AUTO, four-state opacity including fully opaque, three-state width and font size, Settings, and Close. T toggles the panel and Shift+T requests the visible page or spread outside typing/focus contexts. A gear popover contains provider/model selection, an editable target-language field, the provider's official API-key link, key readiness/replacement/deletion, and current-file translation export/cache deletion. Export sorts cached records by page and skips uncached pages. Opening the panel or changing settings never starts translation. AUTO is off by default and, while enabled, requests only visible pages without cached translations after a 650 ms settle delay. Manual spread translation requests both pages; independent controllers, cache keys, and result slots prevent cross-page overwrites, while copy joins both translations with page labels and a divider.
 - More closes after direct actions, Escape, or an outside pointer action. Theme and search remain nested interactive popovers; shortcut help opens as an independent sibling panel so it remains visible after More closes. Ctrl/Command+F opens More before focusing search so the keyboard path remains visible and usable.
 - No `alert()`; use non-blocking accessible live-region toasts.
 
@@ -327,7 +327,7 @@ Unit tests cover:
 - focus-mode F/Escape shortcut classification and modifier preservation
 - PDF extraction using an in-memory generated fixture and output page-count/page-size checks
 
-Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, Gemini/OpenAI provider/model/target-language switching, latest-result replacement and provenance, bottom three-state opacity control, opt-in cache-aware AUTO translation and its cost warning, official key links, session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
+Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, Gemini/OpenAI provider/model/target-language switching, latest-result replacement and provenance, bottom opacity/width/font controls, T/Shift+T shortcuts, current-file text export and cache deletion, opt-in cache-aware AUTO translation and its cost warning, official key links, session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
 
 ## 26. Build / Verification Commands
 
@@ -396,7 +396,7 @@ npm run check
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 103 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 108 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover

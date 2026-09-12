@@ -441,6 +441,14 @@
                 <dd>Toggle focus mode</dd>
               </div>
               <div>
+                <dt><kbd>T</kbd></dt>
+                <dd>Toggle AI translation panel</dd>
+              </div>
+              <div>
+                <dt><kbd>Shift</kbd><kbd>T</kbd></dt>
+                <dd>Translate current page or spread</dd>
+              </div>
+              <div>
                 <dt><kbd>Esc</kbd></dt>
                 <dd>Close a panel or exit focus mode</dd>
               </div>
@@ -473,8 +481,9 @@
             id="translate-page"
             class="document-tool"
             type="button"
-            aria-label="Translate current page"
-            title="Translate current page"
+            aria-label="AI 번역창 열기 또는 닫기, 단축키 T"
+            title="AI 번역창 열기/닫기 · T"
+            aria-keyshortcuts="T"
             aria-expanded="false"
             aria-controls="translation-panel"
           >
@@ -766,6 +775,27 @@
             키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. 번역할 때 현재 페이지 이미지와
             번역 지시문이 Gemini로 전송됩니다.
           </p>
+          <div class="translation-file-cache-actions">
+            <strong>이 파일 번역 기록</strong>
+            <span>저장된 페이지만 페이지 순서대로 내보냅니다.</span>
+            <div>
+              <button id="export-document-translations" type="button">번역 결과 내보내기</button>
+              <button
+                id="clear-document-translations"
+                class="translation-clear-document-cache"
+                type="button"
+              >
+                번역 캐시 삭제
+              </button>
+            </div>
+            <p
+              id="translation-file-cache-state"
+              class="translation-file-cache-state"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
+          </div>
         </section>
 
         <section id="translation-workspace" class="translation-workspace">
@@ -788,7 +818,14 @@
           </div>
           <div class="translation-composer-area">
             <div class="translation-composer-row">
-              <button id="translate-current-page" class="translation-composer" type="button">
+              <button
+                id="translate-current-page"
+                class="translation-composer"
+                type="button"
+                aria-label="현재 페이지 또는 펼침면 번역, 단축키 Shift+T"
+                aria-keyshortcuts="Shift+T"
+                title="현재 페이지 또는 펼침면 번역 · Shift+T"
+              >
                 <span id="translation-composer-label">페이지 1 번역하기</span>
                 <span class="translation-send" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><path d="m6 12 6-6 6 6M12 6v12" /></svg>

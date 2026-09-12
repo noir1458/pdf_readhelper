@@ -22,6 +22,11 @@ export function originalPdfFilename(source: PdfSource): string {
   return filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`;
 }
 
+export function translationTextFilename(source: PdfSource): string {
+  const pdfFilename = originalPdfFilename(source);
+  return `${pdfFilename.slice(0, -4)}-translations.txt`;
+}
+
 function filenameFromUrl(value: string): string {
   try {
     const pathname = new URL(value).pathname;

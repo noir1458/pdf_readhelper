@@ -10,6 +10,7 @@ export type ReadingNavigationAction =
 
 export type OriginalDocumentShortcutAction = "download-original" | "print-original";
 export type FocusModeShortcutAction = "toggle" | "exit";
+export type TranslationShortcutAction = "toggle-panel" | "translate";
 
 export function isPageCopyShortcut(event: CopyShortcutEvent): boolean {
   return (
@@ -90,4 +91,20 @@ export function focusModeShortcutAction(
   }
   if (active && event.key === "Escape") return "exit";
   return event.key.toLowerCase() === "f" ? "toggle" : null;
+}
+
+export function translationShortcutAction(
+  event: CopyShortcutEvent,
+): TranslationShortcutAction | null {
+  if (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.key.toLowerCase() !== "t"
+  ) {
+    return null;
+  }
+  return event.shiftKey ? "translate" : "toggle-panel";
 }

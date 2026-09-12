@@ -5,6 +5,7 @@ import {
   originalDocumentShortcutAction,
   readingNavigationAction,
   readingScrollOffset,
+  translationShortcutAction,
 } from "../src/viewer/keyboard-shortcuts";
 
 const event = (overrides: Partial<Parameters<typeof isPageCopyShortcut>[0]> = {}) => ({
@@ -94,8 +95,21 @@ describe("focus mode shortcut", () => {
     expect(focusModeShortcutAction(event({ key: "f", ctrlKey: true }), false)).toBeNull();
     expect(focusModeShortcutAction(event({ key: "f", shiftKey: true }), false)).toBeNull();
     expect(focusModeShortcutAction(event({ key: "f", repeat: true }), false)).toBeNull();
-    expect(
-      focusModeShortcutAction(event({ key: "f", defaultPrevented: true }), false),
-    ).toBeNull();
+    expect(focusModeShortcutAction(event({ key: "f", defaultPrevented: true }), false)).toBeNull();
+  });
+});
+
+describe("translation shortcuts", () => {
+  it("maps T to panel toggle and Shift+T to translation", () => {
+    expect(translationShortcutAction(event({ key: "t" }))).toBe("toggle-panel");
+    expect(translationShortcutAction(event({ key: "T" }))).toBe("toggle-panel");
+    expect(translationShortcutAction(event({ key: "t", shiftKey: true }))).toBe("translate");
+  });
+
+  it("preserves modified, repeated, and already handled keys", () => {
+    expect(translationShortcutAction(event({ key: "t", ctrlKey: true }))).toBeNull();
+    expect(translationShortcutAction(event({ key: "t", altKey: true }))).toBeNull();
+    expect(translationShortcutAction(event({ key: "t", repeat: true }))).toBeNull();
+    expect(translationShortcutAction(event({ key: "t", defaultPrevented: true }))).toBeNull();
   });
 });

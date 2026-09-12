@@ -848,12 +848,6 @@ button:disabled {
   backdrop-filter: saturate(0.82);
   transition: width 0.18s ease;
 }
-.translation-panel[data-translation-width="wide"] {
-  --translation-panel-width: 560px;
-}
-.translation-panel[data-translation-width="narrow"] {
-  --translation-panel-width: 420px;
-}
 .translation-panel[data-translation-font-size="small"] {
   --translation-output-font-size: 11.5px;
 }
@@ -871,6 +865,12 @@ button:disabled {
   --translation-control-background: rgba(37, 40, 45, 0.78);
   --translation-control-hover: rgba(50, 54, 61, 0.9);
   --translation-footer-background: rgba(13, 15, 18, 0.82);
+}
+.translation-panel[data-translation-theme="opaque"] {
+  --translation-panel-background: #0d0f12;
+  --translation-control-background: #25282d;
+  --translation-control-hover: #32363d;
+  --translation-footer-background: #0d0f12;
 }
 .translation-close {
   font-size: 22px;
@@ -1016,6 +1016,44 @@ button:disabled {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.55;
+}
+.translation-file-cache-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+}
+.translation-file-cache-actions > strong {
+  font-size: 11px;
+}
+.translation-file-cache-actions > span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.translation-file-cache-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.translation-file-cache-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10.5px;
+}
+.translation-file-cache-actions .translation-clear-document-cache {
+  color: #ffaaa9;
+}
+.translation-file-cache-state {
+  margin: 1px 0 0;
+  color: var(--accent);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.translation-file-cache-state[data-kind="error"] {
+  color: #ffaaa9;
 }
 .translation-workspace {
   min-height: 0;
@@ -1265,6 +1303,9 @@ button:disabled {
 .translation-theme-button[data-translation-theme="dark"] {
   color: #fff;
 }
+.translation-theme-button[data-translation-theme="opaque"] {
+  color: #fff;
+}
 .translation-width-button {
   font-size: 18px;
 }
@@ -1289,6 +1330,21 @@ button:disabled {
 }
 .translation-font-size-button[data-translation-font-size="large"] {
   font-size: 14px;
+}
+.translation-panel[data-translation-width="narrow"] .translation-settings-fields {
+  grid-template-columns: 1fr;
+}
+.translation-panel[data-translation-width="narrow"] .translation-setting-field {
+  grid-column: 1;
+}
+.translation-panel[data-translation-width="narrow"] .translation-composer {
+  flex: 0 0 42px;
+  width: 42px;
+  padding: 5px;
+  justify-content: center;
+}
+.translation-panel[data-translation-width="narrow"] #translation-composer-label {
+  display: none;
 }
 .sidebar-tabs {
   display: flex;

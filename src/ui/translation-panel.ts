@@ -6,7 +6,7 @@ import {
   type TranslationProviderInfo,
 } from "../translation/translation-provider";
 
-type TranslationOverlayTheme = "clear" | "balanced" | "dark";
+type TranslationOverlayTheme = "clear" | "balanced" | "dark" | "opaque";
 type TranslationPanelWidth = "wide" | "balanced" | "narrow";
 type TranslationFontSize = "small" | "balanced" | "large";
 
@@ -21,6 +21,7 @@ const TRANSLATION_OVERLAY_THEMES: readonly TranslationOverlayTheme[] = [
   "clear",
   "balanced",
   "dark",
+  "opaque",
 ];
 const TRANSLATION_OVERLAY_THEME_UI: Record<
   TranslationOverlayTheme,
@@ -29,33 +30,24 @@ const TRANSLATION_OVERLAY_THEME_UI: Record<
   clear: { label: "투명", indicator: "○" },
   balanced: { label: "균형", indicator: "◐" },
   dark: { label: "진하게", indicator: "●" },
+  opaque: { label: "불투명", indicator: "■" },
 };
-const TRANSLATION_PANEL_WIDTHS: readonly TranslationPanelWidth[] = [
-  "balanced",
-  "wide",
-  "narrow",
-];
+const TRANSLATION_PANEL_WIDTHS: readonly TranslationPanelWidth[] = ["balanced", "wide", "narrow"];
 const TRANSLATION_PANEL_WIDTH_UI: Record<
   TranslationPanelWidth,
-  { label: string; indicator: string }
+  { label: string; indicator: string; cssWidth: string }
 > = {
-  wide: { label: "넓게", indicator: "↔" },
-  balanced: { label: "기본", indicator: "↔" },
-  narrow: { label: "좁게", indicator: "↔" },
+  wide: { label: "넓게", indicator: "↔", cssWidth: "700px" },
+  balanced: { label: "기본", indicator: "↔", cssWidth: "460px" },
+  narrow: { label: "좁게", indicator: "↔", cssWidth: "340px" },
 };
-const TRANSLATION_FONT_SIZES: readonly TranslationFontSize[] = [
-  "balanced",
-  "large",
-  "small",
-];
-const TRANSLATION_FONT_SIZE_UI: Record<
-  TranslationFontSize,
-  { label: string; indicator: string }
-> = {
-  small: { label: "작게", indicator: "A−" },
-  balanced: { label: "기본", indicator: "A" },
-  large: { label: "크게", indicator: "A+" },
-};
+const TRANSLATION_FONT_SIZES: readonly TranslationFontSize[] = ["balanced", "large", "small"];
+const TRANSLATION_FONT_SIZE_UI: Record<TranslationFontSize, { label: string; indicator: string }> =
+  {
+    small: { label: "작게", indicator: "A−" },
+    balanced: { label: "기본", indicator: "A" },
+    large: { label: "크게", indicator: "A+" },
+  };
 
 /*
  * Target-language input remains editable so a huge language registry is unnecessary.
@@ -81,6 +73,8 @@ export type TranslationPanelActions = {
     pageNumbers: readonly number[],
   ) => void;
   openChanged: (open: boolean) => void;
+  exportDocumentTranslations: () => Promise<number>;
+  clearDocumentTranslations: () => Promise<number>;
 };
 
 export class TranslationPanel {
@@ -109,6 +103,9 @@ export class TranslationPanel {
   readonly #keyState: HTMLElement;
   readonly #keyDescription: HTMLElement;
   readonly #apiKeyLink: HTMLAnchorElement;
+  readonly #exportDocumentButton: HTMLButtonElement;
+  readonly #clearDocumentButton: HTMLButtonElement;
+  readonly #fileCacheState: HTMLElement;
   readonly #status: HTMLElement;
   readonly #errorBox: HTMLElement;
   readonly #errorText: HTMLElement;
@@ -130,6 +127,7 @@ export class TranslationPanel {
   #requestErrors = new Map<number, string>();
   #busyPages = new Set<number>();
   #busy = false;
+  #fileActionBusy = false;
 
   constructor(
     root: HTMLElement,
@@ -173,6 +171,9 @@ export class TranslationPanel {
     this.#keyState = this.#require("#translation-key-state");
     this.#keyDescription = this.#require("#translation-key-description");
     this.#apiKeyLink = this.#require<HTMLAnchorElement>("#translation-api-key-link");
+    this.#exportDocumentButton = this.#require<HTMLButtonElement>("#export-document-translations");
+    this.#clearDocumentButton = this.#require<HTMLButtonElement>("#clear-document-translations");
+    this.#fileCacheState = this.#require("#translation-file-cache-state");
     this.#status = this.#require("#translation-status");
     this.#errorBox = this.#require("#translation-error");
     this.#errorText = this.#require("#translation-error-message");
@@ -223,14 +224,16 @@ export class TranslationPanel {
     );
     this.#keyDelete.addEventListener("click", () => this.#clearKey());
     this.#keyForm.addEventListener("submit", (event) => this.#saveKey(event));
-    this.#translateButton.addEventListener(
-      "click",
-      () =>
-        void this.#requestTranslation(
-          this.#requestErrors.size > 0 ? this.#retryPages() : this.#pageNumbers,
-        ),
-    );
+    this.#translateButton.addEventListener("click", () => this.requestVisiblePages());
     this.#copyButton.addEventListener("click", () => void this.#copyTranslation());
+    this.#exportDocumentButton.addEventListener(
+      "click",
+      () => void this.#exportDocumentTranslations(),
+    );
+    this.#clearDocumentButton.addEventListener(
+      "click",
+      () => void this.#clearDocumentTranslations(),
+    );
     document.addEventListener("pointerdown", (event) => this.#closeSettingsFromOutside(event));
     document.addEventListener("keydown", (event) => this.#handleEscape(event));
 
@@ -258,6 +261,12 @@ export class TranslationPanel {
     return this.#autoTranslate;
   }
 
+  requestVisiblePages(): void {
+    void this.#requestTranslation(
+      this.#requestErrors.size > 0 ? this.#retryPages() : this.#pageNumbers,
+    );
+  }
+
   open(pageNumbers: readonly number[]): void {
     this.#setPageNumbers(pageNumbers);
     this.#root.hidden = false;
@@ -281,6 +290,7 @@ export class TranslationPanel {
     autoTranslateIfMissing = false,
   ): void {
     if (!this.#matchesSelection(providerId, modelId, targetLanguage)) return;
+    this.#setFileCacheState("");
     this.#setPageNumbers(pages.map(({ pageNumber }) => pageNumber));
     this.#translations = new Map(
       pages.flatMap(({ pageNumber, translation }) =>
@@ -348,13 +358,7 @@ export class TranslationPanel {
           ),
         ),
       );
-      if (
-        !this.#matchesSelection(
-          requestedProviderId,
-          requestedModelId,
-          requestedTargetLanguage,
-        )
-      ) {
+      if (!this.#matchesSelection(requestedProviderId, requestedModelId, requestedTargetLanguage)) {
         return;
       }
       for (const [index, result] of results.entries()) {
@@ -398,6 +402,56 @@ export class TranslationPanel {
       );
       this.#render();
     }
+  }
+
+  async #exportDocumentTranslations(): Promise<void> {
+    this.#setFileActionBusy(true);
+    this.#setFileCacheState("");
+    try {
+      const count = await this.#actions.exportDocumentTranslations();
+      this.#setFileCacheState(`${count}개 페이지 번역을 텍스트 파일로 내보냈습니다.`, "success");
+    } catch (error) {
+      this.#setFileCacheState(errorMessage(error), "error");
+    } finally {
+      this.#setFileActionBusy(false);
+    }
+  }
+
+  async #clearDocumentTranslations(): Promise<void> {
+    const confirmed = window.confirm(
+      "현재 PDF에 저장된 모든 페이지 번역을 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+    );
+    if (!confirmed) return;
+    this.#setFileActionBusy(true);
+    this.#setFileCacheState("");
+    try {
+      const count = await this.#actions.clearDocumentTranslations();
+      this.#translations.clear();
+      this.#requestErrors.clear();
+      this.#render();
+      this.#setFileCacheState(
+        count > 0
+          ? `${count}개 페이지의 저장된 번역을 삭제했습니다.`
+          : "삭제할 저장된 번역이 없습니다.",
+        "success",
+      );
+    } catch (error) {
+      this.#setFileCacheState(errorMessage(error), "error");
+    } finally {
+      this.#setFileActionBusy(false);
+    }
+  }
+
+  #setFileActionBusy(busy: boolean): void {
+    this.#fileActionBusy = busy;
+    this.#exportDocumentButton.disabled = busy || this.#busy;
+    this.#clearDocumentButton.disabled = busy || this.#busy;
+  }
+
+  #setFileCacheState(message: string, kind: "success" | "error" = "success"): void {
+    this.#fileCacheState.textContent = message;
+    this.#fileCacheState.dataset.kind = kind;
+    this.#fileCacheState.hidden = message.length === 0;
   }
 
   #saveKey(event: SubmitEvent): void {
@@ -492,16 +546,14 @@ export class TranslationPanel {
   #cyclePanelWidth(): void {
     const currentIndex = TRANSLATION_PANEL_WIDTHS.indexOf(this.#panelWidth);
     this.#panelWidth =
-      TRANSLATION_PANEL_WIDTHS[(currentIndex + 1) % TRANSLATION_PANEL_WIDTHS.length] ??
-      "balanced";
+      TRANSLATION_PANEL_WIDTHS[(currentIndex + 1) % TRANSLATION_PANEL_WIDTHS.length] ?? "balanced";
     this.#renderWidthButton();
   }
 
   #cycleFontSize(): void {
     const currentIndex = TRANSLATION_FONT_SIZES.indexOf(this.#fontSize);
     this.#fontSize =
-      TRANSLATION_FONT_SIZES[(currentIndex + 1) % TRANSLATION_FONT_SIZES.length] ??
-      "balanced";
+      TRANSLATION_FONT_SIZES[(currentIndex + 1) % TRANSLATION_FONT_SIZES.length] ?? "balanced";
     this.#renderFontSizeButton();
   }
 
@@ -542,6 +594,8 @@ export class TranslationPanel {
     this.#keyInput.disabled = this.#busy;
     this.#keySubmit.disabled = this.#busy;
     this.#keyDelete.disabled = this.#busy || !hasKey;
+    this.#exportDocumentButton.disabled = this.#busy || this.#fileActionBusy;
+    this.#clearDocumentButton.disabled = this.#busy || this.#fileActionBusy;
     this.#keyDelete.hidden = !hasKey;
     this.#keyState.dataset.kind = "ready";
     this.#keyState.textContent = hasKey
@@ -651,8 +705,7 @@ export class TranslationPanel {
     const theme = TRANSLATION_OVERLAY_THEME_UI[this.#theme];
     const nextTheme =
       TRANSLATION_OVERLAY_THEMES[
-        (TRANSLATION_OVERLAY_THEMES.indexOf(this.#theme) + 1) %
-          TRANSLATION_OVERLAY_THEMES.length
+        (TRANSLATION_OVERLAY_THEMES.indexOf(this.#theme) + 1) % TRANSLATION_OVERLAY_THEMES.length
       ] ?? "balanced";
     const next = TRANSLATION_OVERLAY_THEME_UI[nextTheme];
     const label = `번역 배경: ${theme.label} · 누르면 ${next.label}`;
@@ -667,12 +720,12 @@ export class TranslationPanel {
     const width = TRANSLATION_PANEL_WIDTH_UI[this.#panelWidth];
     const nextWidth =
       TRANSLATION_PANEL_WIDTHS[
-        (TRANSLATION_PANEL_WIDTHS.indexOf(this.#panelWidth) + 1) %
-          TRANSLATION_PANEL_WIDTHS.length
+        (TRANSLATION_PANEL_WIDTHS.indexOf(this.#panelWidth) + 1) % TRANSLATION_PANEL_WIDTHS.length
       ] ?? "balanced";
     const next = TRANSLATION_PANEL_WIDTH_UI[nextWidth];
     const label = `번역 창 너비: ${width.label} · 누르면 ${next.label}`;
     this.#root.dataset.translationWidth = this.#panelWidth;
+    this.#root.style.width = `min(100vw, ${width.cssWidth})`;
     this.#widthButton.dataset.translationWidth = this.#panelWidth;
     this.#widthButton.setAttribute("aria-label", label);
     this.#widthButton.title = label;
@@ -683,8 +736,7 @@ export class TranslationPanel {
     const fontSize = TRANSLATION_FONT_SIZE_UI[this.#fontSize];
     const nextFontSize =
       TRANSLATION_FONT_SIZES[
-        (TRANSLATION_FONT_SIZES.indexOf(this.#fontSize) + 1) %
-          TRANSLATION_FONT_SIZES.length
+        (TRANSLATION_FONT_SIZES.indexOf(this.#fontSize) + 1) % TRANSLATION_FONT_SIZES.length
       ] ?? "balanced";
     const next = TRANSLATION_FONT_SIZE_UI[nextFontSize];
     const label = `번역 글자 크기: ${fontSize.label} · 누르면 ${next.label}`;

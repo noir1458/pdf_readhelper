@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { originalPdfFilename, rangeFilename } from "../src/shared/filename";
+import {
+  originalPdfFilename,
+  rangeFilename,
+  translationTextFilename,
+} from "../src/shared/filename";
 
 describe("rangeFilename", () => {
   it("uses a single page name", () => expect(rangeFilename({ start: 7, end: 7 })).toBe("7.pdf"));
@@ -32,6 +36,17 @@ describe("originalPdfFilename", () => {
     );
     expect(originalPdfFilename({ kind: "local-file", name: "notes: chapter?.pdf" })).toBe(
       "notes_ chapter_.pdf",
+    );
+  });
+});
+
+describe("translationTextFilename", () => {
+  it("uses the sanitized PDF basename", () => {
+    expect(translationTextFilename({ kind: "local-file", name: "My Book.pdf" })).toBe(
+      "My Book-translations.txt",
+    );
+    expect(translationTextFilename({ kind: "local-file", name: "unsafe:name" })).toBe(
+      "unsafe_name-translations.txt",
     );
   });
 });

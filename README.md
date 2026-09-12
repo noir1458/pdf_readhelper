@@ -145,6 +145,7 @@ Browser tabs, scrollbars, and extension controls are not captured. If the clipbo
 4. Use the compact bottom translation action. In spread layout it requests both visible pages independently and shows the left-page result, a divider, then the right-page result. Adjacent controls cycle the translation background, panel width, and result font size through three states each. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
 5. Optionally enable **AUTO**. While it is on and the translation panel is open, moving to another page or spread waits 650 ms after the cache check and requests only the visible pages without cached results. Moving again during that pause cancels the pending request. Hover or focus the button to see the per-page token/cost warning.
 6. Read the target-language result in the right panel or copy it as text.
+7. From the gear menu, export every cached translation for the current PDF as one page-ordered UTF-8 text file. Pages without a cached result are omitted. The same section can delete only the current PDF's translation cache after confirmation.
 
 Opening the panel, changing provider/model/language, cycling opacity, or moving pages with **AUTO** off never sends a request. Each PDF page keeps only its latest translation locally, including metadata that identifies the provider, model, and target language that produced it. Changing those settings does not duplicate or invalidate the page cache; pressing **Translate again** replaces that page's previous result. With **AUTO** on, each newly visited uncached page can create a billed request, while any already-cached page remains local-only. Request errors remain in the result conversation with retry and settings actions instead of disappearing with a toast.
 
@@ -162,6 +163,8 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 
 ## Keyboard shortcuts
 
+- **T**: open or close the AI translation panel.
+- **Shift+T**: request translation for the current page or visible spread. If the panel is closed, it opens first.
 - **⌘F** on macOS / **Ctrl+F** elsewhere: search all text-bearing pages in the current PDF. Enter moves forward and Shift+Enter moves backward.
 - **⌘C** on macOS / **Ctrl+C** elsewhere while viewing the PDF: copy the current page as an image, matching the IMG button. Normal copy is preserved in inputs and when text is selected.
 - **⌘⇧C** on macOS / **Ctrl+Shift+C** elsewhere: copy current page
@@ -174,7 +177,7 @@ A single page such as `7` downloads as `7.pdf`. The operation preserves normal t
 - **F**: enter or exit focus/fullscreen reading mode. **Escape** also exits while focus mode is active.
 - **Left Arrow** / **Right Arrow**: turn the previous / next page or spread while page-turn mode is active.
 
-Reading shortcuts apply to the PDF area only. In page-turn mode, Space/Page Down and Shift+Space/Page Up turn pages instead of scrolling the viewport. Native behavior is preserved in toolbar controls, sidebar and translation content, links, inputs, and while text is selected. The plain copy shortcut works inside the viewer. The Shift copy variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
+Reading shortcuts apply to the PDF area only. In page-turn mode, Space/Page Down and Shift+Space/Page Up turn pages instead of scrolling the viewport. Translation shortcuts are disabled while typing in an input, textarea, select, or editable element, and while focus mode is active. Native behavior is preserved in toolbar controls, sidebar and translation content, links, inputs, and while text is selected. The plain copy shortcut works inside the viewer. The Shift copy variant is the extension-wide manifest command and can be changed at `chrome://extensions/shortcuts`; Chrome may reserve or conflict with suggested bindings.
 
 ## Local PDFs
 
@@ -284,7 +287,10 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] In spread layout, translate a pair and confirm both requests run independently, the left result appears above the divider, the right result appears below it, and each page retains its own cache/error/provenance state
 - [ ] Switch providers, models, and target languages, then revisit a translated page; confirm its one latest result remains, its creation metadata is visible above the result, and a new translation replaces it
 - [ ] Open/close the gear settings with its button, Escape, and an outside click; switch provider/model, use a suggested and custom BCP 47 target, follow each official API-key link, replace/delete each key, and confirm the result remains usable
-- [ ] Cycle all three opacity, panel-width, and result-font-size states from the bottom controls; enable AUTO, hover/focus its cost warning, rapidly cross several pages, and confirm only the final settled uncached page triggers after the delay
+- [ ] Export a partially translated PDF and confirm the UTF-8 text file contains cached pages in ascending order while skipping gaps; then confirm current-file cache deletion leaves other PDFs untouched
+- [ ] Cycle all four opacity states and all three panel-width and result-font-size states from the bottom controls; confirm the opaque state fully hides the PDF beneath the panel
+- [ ] Press T to open/close the translation panel and Shift+T to translate; verify typing fields and focus mode retain native key behavior
+- [ ] Enable AUTO, hover/focus its cost warning, rapidly cross several pages, and confirm only the final settled uncached page triggers after the delay
 - [ ] Use **Translate again**, **Copy translation**, inline **Retry**, inline **Check settings**, Escape, and the panel close button
 - [ ] Trigger a temporary Gemini failure and confirm the full error remains in the translation result instead of appearing only as a toast
 - [ ] Trigger a denied clipboard and confirm PNG fallback download
