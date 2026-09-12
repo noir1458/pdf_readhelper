@@ -1,10 +1,10 @@
-# PDF Read Helper
+# PanePDF
 
 This document is the single source of truth for product scope, architecture, constraints, and project status. Read it before changing code and update it before ending a development session.
 
 ## 1. Mission
 
-PDF Read Helper reduces the repeated friction involved in reading and translating pages from papers and technical books:
+PanePDF reduces the repeated friction involved in reading and translating pages from papers and technical books:
 
 `PDF reading → local page preparation → clipboard/file or explicit page/spread translation`
 
@@ -15,7 +15,7 @@ It locally renders a current PDF page to PNG or copies original PDF page objects
 - One personal user
 - macOS and Google Chrome
 - Primarily reads papers, technical PDFs, and textbooks
-- Uses an unpacked extension; Chrome Web Store distribution is not a priority
+- Currently uses an unpacked extension; public Chrome Web Store distribution is planned
 - No accounts, analytics, telemetry, or data collection
 
 ## 3. Core User Flows
@@ -40,7 +40,7 @@ Initial versions do not include:
 - Background translation with the panel closed or bulk whole-document translation
 - OCR or text-layer extraction as the primary translation path
 - Translation providers beyond Gemini and OpenAI, arbitrary model selection, or a general LLM plugin system
-- Chrome Web Store optimization
+- Paid service infrastructure or store-specific growth features beyond a safe public listing
 - Direct integration with LLM websites, including automatic navigation, paste, or attachment
 - Chrome native PDF viewer DOM manipulation as a core mechanism
 - Unnecessary UI frameworks or state managers
@@ -70,7 +70,7 @@ The viewer is the only owner of loaded PDF bytes/document state. The visible vie
 ## 7. Project Structure
 
 ```text
-pdf_readhelper/
+panepdf/
 ├── AGENT.md
 ├── CLAUDE.md
 ├── README.md
@@ -226,7 +226,7 @@ Manifest commands:
 
 - `copy-current-page`: suggested macOS `Command+Shift+C`, other platforms `Ctrl+Shift+C`
 
-Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke the same busy-state-managed action as the IMG button. The viewer preserves native copy when focus is in an input, textarea, select, or editable element, or when the user has selected text. Repeated or already-handled key events and shortcuts with Shift/Alt are ignored. Manifest commands target an active PDF Read Helper viewer and show an in-viewer error if no document is loaded. Users can remap the Shift variant at `chrome://extensions/shortcuts`. Chrome may reject/conflict with suggested manifest shortcuts; this requires manual verification.
+Inside the viewer, unmodified `Command+C` on macOS and `Ctrl+C` elsewhere invoke the same busy-state-managed action as the IMG button. The viewer preserves native copy when focus is in an input, textarea, select, or editable element, or when the user has selected text. Repeated or already-handled key events and shortcuts with Shift/Alt are ignored. Manifest commands target an active PanePDF viewer and show an in-viewer error if no document is loaded. Users can remap the Shift variant at `chrome://extensions/shortcuts`. Chrome may reject/conflict with suggested manifest shortcuts; this requires manual verification.
 
 `Command+F` on macOS and `Ctrl+F` elsewhere open the extension's PDF search popover. Search extracts and caches each page's embedded text in memory with bounded concurrency, maps matches back to the lazy visible text layers, and uses Enter/Shift+Enter or arrow buttons for wrapped next/previous navigation. Scanned pages require an existing OCR text layer; the extension does not run OCR.
 
@@ -351,7 +351,7 @@ npm run check
 4. Enable **Developer mode**
 5. Click **Load unpacked**
 6. Select `<project>/dist`
-7. Pin PDF Read Helper
+7. Pin PanePDF
 8. Open the extension and choose a local PDF, or open a public PDF URL and use the popup
 9. For direct `file://` URLs: extension Details → **Allow access to file URLs** → ON
 10. Remap shortcuts at `chrome://extensions/shortcuts` if needed
@@ -374,7 +374,7 @@ npm run check
 - Very large PDFs/pages remain bounded by browser memory despite lazy rendering and pixel limits.
 - Persisting many very large PDFs may hit Chrome's origin storage quota; users can remove cached copies without deleting originals.
 - Integrated translation requires the user's own eligible Gemini or OpenAI API key and network access. Both provider keys are forgotten when the viewer tab closes.
-- Direct browser-held bearer credentials are for this private unpacked extension only; a public build requires a server-side credential design.
+- User-provided Gemini/OpenAI credentials remain in the active viewer tab and go directly to the selected provider. A public listing must never embed a shared project credential and must disclose this BYOK data flow accurately.
 
 ## 29. Current Status
 
@@ -423,6 +423,7 @@ npm run check
 - [x] Replaced the toolbar hamburger and persistent sidebar rail with left-edge reveal behavior
 - [x] Added AI-free current-page Content Fit using cached neutral-margin detection and safe full-page fallback
 - [x] Stabilized page-turn Fit sizing across viewer/window resize changes
+- [x] Renamed the public product identity to PanePDF and prepared an English product README with real viewer screenshots
 
 ### In progress
 
@@ -430,15 +431,23 @@ npm run check
 
 ### Next
 
-1. Load `dist/` unpacked and complete the README manual verification checklist, including auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
+1. Reload `dist/` unpacked and complete the README manual verification checklist, including the PanePDF branding, auto-hide interaction, crop safety, and an API translation request with a low-limit test key.
 2. Fix any Chrome-runtime issues found in viewer chrome, worker loading, clipboard, adaptive cropping, Gemini/OpenAI requests and switching, file URLs, or shortcut dispatch.
-3. Keep reading statistics out of scope; add a settings surface only if repeated real usage exposes a concrete preference that cannot remain a named constant.
+3. Prepare Chrome Web Store copy, privacy disclosures, screenshots, and the final extension package without embedding provider credentials.
 
 ### Blockers
 
 - The installed branded Google Chrome rejects command-line `--load-extension`/`--disable-extensions-except`, so automated headless extension loading was not possible. Manual unpacked-extension verification is required.
 
 ## 30. Decision Log
+
+### 2026-09-12 — Publish under the PanePDF product name
+
+**Decision:** Rename all public UI, manifest, package, README, and contributor-documentation references from PDF Read Helper to PanePDF. Keep the existing IndexedDB database names and localStorage keys as stable internal identifiers so current saved PDFs, bookmarks, reading preferences, and translation caches remain available after the rename.
+
+**Reason:** PDF Read Helper accurately described the prototype but was generic and less natural as a product name. PanePDF is concise, reflects the reader's side-by-side and overlay surfaces, and had no exact conflicting product, Chrome extension, GitHub project, npm package, or PyPI package in the preliminary public search.
+
+**Consequences:** The repository directory and remote may be renamed separately without affecting Git history. Internal storage identifiers continue to contain the former technical namespace by design; changing them later requires an explicit data migration. Public-store publication still requires a formal trademark review and current store-policy/privacy verification.
 
 ### 2026-09-08 — Use an extension-owned PDF.js viewer
 

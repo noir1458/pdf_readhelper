@@ -654,8 +654,7 @@ async function openBytes(
   void documentSidebar.setDocument(pdfDocument);
   await loadBookmarks(libraryId);
   emptyState.hidden = true;
-  document.title =
-    source.kind === "local-file" ? `${source.name} — PDF Read Helper` : "PDF Read Helper";
+  document.title = source.kind === "local-file" ? `${source.name} — PanePDF` : "PanePDF";
   if (initialPage > 1) navigateToPage(initialPage, "auto", false);
   await renderNear(initialPage);
   if (session.snapshot.zoomMode === "fit-content") {

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "PDF Read Helper",
+  "name": "PanePDF",
   "version": "0.1.0",
   "description": "Read, copy, extract, and optionally translate PDF pages.",
   "minimum_chrome_version": "120",
@@ -11,7 +11,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "PDF Read Helper",
+    "default_title": "PanePDF",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",

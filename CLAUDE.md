@@ -1,4 +1,4 @@
-# PDF Read Helper — Claude Code Instructions
+# PanePDF — Claude Code Instructions
 
 @AGENT.md
 
