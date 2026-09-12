@@ -125,7 +125,7 @@ describe("Gemini translation responses", () => {
         "Korean (ko)",
       ),
     ).rejects.toThrow(
-      "현재 Gemini 모델 사용량이 많습니다. 잠시 후 다시 시도하거나 설정에서 다른 모델을 선택하세요.",
+      "This Gemini model is experiencing high demand. Try again later or choose another model in Settings.",
     );
   });
 });

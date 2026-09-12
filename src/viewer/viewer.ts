@@ -1695,7 +1695,7 @@ async function loadCachedTranslations(
       modelId,
       targetLanguage,
       requestedPages,
-      "저장된 번역을 불러오지 못했습니다.",
+      "Could not load the saved translation.",
     );
   }
 }
@@ -1708,7 +1708,7 @@ async function requestPageTranslation(
   apiKey: string,
 ): Promise<CachedPageTranslation> {
   const documentId = activeDocumentId;
-  if (!documentId) throw new UserFacingError("번역할 PDF가 열려 있지 않습니다.");
+  if (!documentId) throw new UserFacingError("No PDF is open for translation.");
   const pdfDocument = session.requireDocument();
   translationRequestControllers.get(pageNumber)?.abort();
   const controller = new AbortController();
@@ -1751,10 +1751,10 @@ function abortTranslationRequests(): void {
 async function exportDocumentTranslations(): Promise<number> {
   const documentId = activeDocumentId;
   const source = session.snapshot.source;
-  if (!documentId || !source) throw new UserFacingError("내보낼 PDF가 열려 있지 않습니다.");
+  if (!documentId || !source) throw new UserFacingError("No PDF is open for export.");
   const translations = await translationCache.listDocument(documentId);
   const text = formatTranslationExport(translations);
-  if (!text) throw new UserFacingError("내보낼 저장된 번역이 없습니다.");
+  if (!text) throw new UserFacingError("There are no saved translations to export.");
   await downloadBlob(
     new Blob(["\uFEFF", text], { type: "text/plain;charset=utf-8" }),
     translationTextFilename(source),
@@ -1764,7 +1764,7 @@ async function exportDocumentTranslations(): Promise<number> {
 
 async function clearDocumentTranslations(): Promise<number> {
   const documentId = activeDocumentId;
-  if (!documentId) throw new UserFacingError("번역 캐시를 삭제할 PDF가 열려 있지 않습니다.");
+  if (!documentId) throw new UserFacingError("No PDF is open for clearing translation cache.");
   const translations = await translationCache.listDocument(documentId);
   await translationCache.removeDocument(documentId);
   return translations.length;

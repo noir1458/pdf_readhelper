@@ -481,8 +481,8 @@
             id="translate-page"
             class="document-tool"
             type="button"
-            aria-label="AI 번역창 열기 또는 닫기, 단축키 T"
-            title="AI 번역창 열기/닫기 · T"
+            aria-label="Open or close AI translation, shortcut T"
+            title="Open/close AI translation · T"
             aria-keyshortcuts="T"
             aria-expanded="false"
             aria-controls="translation-panel"
@@ -692,37 +692,37 @@
           id="translation-settings-popover"
           class="translation-settings-popover"
           role="dialog"
-          aria-label="번역 AI 설정"
+          aria-label="AI translation settings"
           hidden
         >
           <header>
             <div>
-              <strong>번역 AI 설정</strong>
-              <span>공급자마다 키와 모델을 따로 사용합니다.</span>
+              <strong>AI translation settings</strong>
+              <span>Each provider uses its own key and model.</span>
             </div>
             <button
               id="close-translation-settings"
               class="icon-button"
               type="button"
-              aria-label="설정 닫기"
+              aria-label="Close settings"
             >
               ×
             </button>
           </header>
           <div class="translation-settings-fields">
             <label class="translation-setting-field" for="translation-provider">
-              <span>현재 번역 AI</span>
+              <span>Translation provider</span>
               <select id="translation-provider"></select>
             </label>
             <label class="translation-setting-field" for="translation-model">
-              <span>선택된 모델</span>
+              <span>Model</span>
               <select id="translation-model"></select>
             </label>
             <label
               class="translation-setting-field translation-language-field"
               for="translation-target-language"
             >
-              <span>번역 목표 언어</span>
+              <span>Target language</span>
               <input
                 id="translation-target-language"
                 type="text"
@@ -752,7 +752,7 @@
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noopener noreferrer"
-                >Gemini API 키 받기 ↗</a
+                >Get Gemini API key ↗</a
               >
             </div>
             <div>
@@ -764,28 +764,28 @@
                 spellcheck="false"
                 required
               />
-              <button id="translation-key-submit" class="primary" type="submit">키 사용</button>
+              <button id="translation-key-submit" class="primary" type="submit">Use key</button>
             </div>
           </form>
           <p id="translation-key-state" class="translation-key-state" aria-live="polite"></p>
           <button id="delete-translation-key" class="translation-delete-key" type="button">
-            현재 AI 키 삭제
+            Remove current API key
           </button>
           <p id="translation-key-description" class="translation-key-description">
-            키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. 번역할 때 현재 페이지 이미지와
-            번역 지시문이 Gemini로 전송됩니다.
+            The key stays only in this viewer tab's memory and is never saved. When you translate,
+            the visible page image and translation instructions are sent to Gemini.
           </p>
           <div class="translation-file-cache-actions">
-            <strong>이 파일 번역 기록</strong>
-            <span>저장된 페이지만 페이지 순서대로 내보냅니다.</span>
+            <strong>Translations for this file</strong>
+            <span>Export cached pages in page order, skipping missing pages.</span>
             <div>
-              <button id="export-document-translations" type="button">번역 결과 내보내기</button>
+              <button id="export-document-translations" type="button">Export translations</button>
               <button
                 id="clear-document-translations"
                 class="translation-clear-document-cache"
                 type="button"
               >
-                번역 캐시 삭제
+                Delete translation cache
               </button>
             </div>
             <p
@@ -803,16 +803,16 @@
             <div class="translation-response-body">
               <p id="translation-status" class="translation-status" aria-live="polite" hidden></p>
               <div id="translation-error" class="translation-error" role="alert" hidden>
-                <strong>번역하지 못했습니다</strong>
+                <strong>Translation failed</strong>
                 <p id="translation-error-message"></p>
                 <div>
-                  <button id="retry-translation" type="button">다시 시도</button>
-                  <button id="error-translation-settings" type="button">설정 확인</button>
+                  <button id="retry-translation" type="button">Retry</button>
+                  <button id="error-translation-settings" type="button">Check settings</button>
                 </div>
               </div>
               <article id="translation-output" class="translation-output"></article>
               <div id="translation-result-actions" class="translation-result-actions" hidden>
-                <button id="copy-translation" type="button">번역 복사</button>
+                <button id="copy-translation" type="button">Copy translation</button>
               </div>
             </div>
           </div>
@@ -822,11 +822,11 @@
                 id="translate-current-page"
                 class="translation-composer"
                 type="button"
-                aria-label="현재 페이지 또는 펼침면 번역, 단축키 Shift+T"
+                aria-label="Translate current page or spread, shortcut Shift+T"
                 aria-keyshortcuts="Shift+T"
-                title="현재 페이지 또는 펼침면 번역 · Shift+T"
+                title="Translate current page or spread · Shift+T"
               >
-                <span id="translation-composer-label">페이지 1 번역하기</span>
+                <span id="translation-composer-label">Translate page 1</span>
                 <span class="translation-send" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><path d="m6 12 6-6 6 6M12 6v12" /></svg>
                 </span>
@@ -835,22 +835,22 @@
                 id="toggle-translation-auto"
                 class="translation-bottom-button translation-auto"
                 type="button"
-                aria-label="자동 번역 켜기"
+                aria-label="Turn on automatic translation"
                 aria-describedby="translation-auto-help"
                 aria-pressed="false"
               >
                 AUTO
                 <span id="translation-auto-help" class="translation-auto-tooltip" role="tooltip">
-                  페이지 이동 후 잠시 멈췄을 때 저장된 번역이 없으면 자동으로 요청합니다. 페이지마다
-                  토큰과 비용이 발생할 수 있습니다.
+                  After page navigation settles, automatically request any page without a cached
+                  translation. Each page may use tokens and incur charges.
                 </span>
               </button>
               <button
                 id="cycle-translation-theme"
                 class="icon-button translation-bottom-button translation-theme-button"
                 type="button"
-                aria-label="번역 화면 투명도: 현재 수준"
-                title="번역 화면 투명도: 현재 수준"
+                aria-label="Translation background: Balanced"
+                title="Translation background: Balanced"
               >
                 <span id="translation-theme-indicator" aria-hidden="true">◐</span>
               </button>
@@ -858,8 +858,8 @@
                 id="cycle-translation-width"
                 class="icon-button translation-bottom-button translation-width-button"
                 type="button"
-                aria-label="번역 창 너비: 기본"
-                title="번역 창 너비: 기본"
+                aria-label="Translation panel width: Default"
+                title="Translation panel width: Default"
               >
                 <span id="translation-width-indicator" aria-hidden="true">↔</span>
               </button>
@@ -867,8 +867,8 @@
                 id="cycle-translation-font-size"
                 class="icon-button translation-bottom-button translation-font-size-button"
                 type="button"
-                aria-label="번역 글자 크기: 기본"
-                title="번역 글자 크기: 기본"
+                aria-label="Translation font size: Default"
+                title="Translation font size: Default"
               >
                 <span id="translation-font-size-indicator" aria-hidden="true">A</span>
               </button>
@@ -876,10 +876,10 @@
                 id="open-translation-settings"
                 class="icon-button translation-bottom-button translation-settings-button"
                 type="button"
-                aria-label="번역 AI 설정"
+                aria-label="AI translation settings"
                 aria-controls="translation-settings-popover"
                 aria-expanded="false"
-                title="번역 AI 설정"
+                title="AI translation settings"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
@@ -891,8 +891,8 @@
                 id="close-translation-panel"
                 class="icon-button translation-bottom-button translation-close"
                 type="button"
-                aria-label="번역 패널 닫기"
-                title="닫기"
+                aria-label="Close translation panel"
+                title="Close"
               >
                 ×
               </button>

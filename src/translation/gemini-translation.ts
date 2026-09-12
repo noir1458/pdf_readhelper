@@ -116,25 +116,25 @@ export function geminiResponseUsage(payload: unknown): TranslationUsage {
 function apiErrorMessage(status: number, payload: unknown): string {
   const message = responseError(payload);
   if (status === 401 || status === 403 || isInvalidApiKey(payload)) {
-    return "Gemini가 이 API 키를 거부했습니다. 키와 연결된 프로젝트를 확인하세요.";
+    return "Gemini rejected this API key. Check the key and its associated project.";
   }
   if (status === 429) {
-    return message ?? "Gemini 요청 한도 또는 결제 잔액을 확인한 뒤 다시 시도하세요.";
+    return message ?? "Check your Gemini quota or billing balance, then try again.";
   }
   if (status === 503) {
-    return "현재 Gemini 모델 사용량이 많습니다. 잠시 후 다시 시도하거나 설정에서 다른 모델을 선택하세요.";
+    return "This Gemini model is experiencing high demand. Try again later or choose another model in Settings.";
   }
-  return message ? `Gemini 요청 실패: ${message}` : `Gemini 요청 실패 (${status}).`;
+  return message ? `Gemini request failed: ${message}` : `Gemini request failed (${status}).`;
 }
 
 function blockedOrEmptyMessage(payload: unknown): string {
   if (isRecord(payload) && isRecord(payload.promptFeedback)) {
     const reason = payload.promptFeedback.blockReason;
     if (typeof reason === "string" && reason) {
-      return `Gemini가 이 페이지 처리를 차단했습니다 (${reason}).`;
+      return `Gemini blocked processing for this page (${reason}).`;
     }
   }
-  return "Gemini가 이 페이지의 번역문을 반환하지 않았습니다.";
+  return "Gemini did not return a translation for this page.";
 }
 
 function responseError(payload: unknown): string | null {
@@ -162,6 +162,8 @@ async function blobToBase64(blob: Blob): Promise<string> {
     }
     return btoa(chunks.join(""));
   } catch (error) {
-    throw new UserFacingError("번역할 페이지 이미지를 준비하지 못했습니다.", { cause: error });
+    throw new UserFacingError("Could not prepare the page image for translation.", {
+      cause: error,
+    });
   }
 }

@@ -27,26 +27,26 @@ const TRANSLATION_OVERLAY_THEME_UI: Record<
   TranslationOverlayTheme,
   { label: string; indicator: string }
 > = {
-  clear: { label: "투명", indicator: "○" },
-  balanced: { label: "균형", indicator: "◐" },
-  dark: { label: "진하게", indicator: "●" },
-  opaque: { label: "불투명", indicator: "■" },
+  clear: { label: "Clear", indicator: "○" },
+  balanced: { label: "Balanced", indicator: "◐" },
+  dark: { label: "Dark", indicator: "●" },
+  opaque: { label: "Opaque", indicator: "■" },
 };
 const TRANSLATION_PANEL_WIDTHS: readonly TranslationPanelWidth[] = ["balanced", "wide", "narrow"];
 const TRANSLATION_PANEL_WIDTH_UI: Record<
   TranslationPanelWidth,
   { label: string; indicator: string; cssWidth: string }
 > = {
-  wide: { label: "넓게", indicator: "↔", cssWidth: "700px" },
-  balanced: { label: "기본", indicator: "↔", cssWidth: "460px" },
-  narrow: { label: "좁게", indicator: "↔", cssWidth: "340px" },
+  wide: { label: "Wide", indicator: "↔", cssWidth: "700px" },
+  balanced: { label: "Default", indicator: "↔", cssWidth: "460px" },
+  narrow: { label: "Narrow", indicator: "↔", cssWidth: "340px" },
 };
 const TRANSLATION_FONT_SIZES: readonly TranslationFontSize[] = ["balanced", "large", "small"];
 const TRANSLATION_FONT_SIZE_UI: Record<TranslationFontSize, { label: string; indicator: string }> =
   {
-    small: { label: "작게", indicator: "A−" },
-    balanced: { label: "기본", indicator: "A" },
-    large: { label: "크게", indicator: "A+" },
+    small: { label: "Small", indicator: "A−" },
+    balanced: { label: "Default", indicator: "A" },
+    large: { label: "Large", indicator: "A+" },
   };
 
 /*
@@ -331,7 +331,7 @@ export class TranslationPanel {
     if (requestedPages.length === 0) return;
     const apiKey = this.#apiKeys.get(this.#providerId);
     if (!apiKey) {
-      const message = `${this.#provider().displayName} API 키가 필요합니다. 설정에서 키를 입력하세요.`;
+      const message = `${this.#provider().displayName} API key required. Enter it in Settings.`;
       for (const pageNumber of requestedPages) this.#requestErrors.set(pageNumber, message);
       this.#render();
       this.#openSettings(true);
@@ -389,16 +389,16 @@ export class TranslationPanel {
       translations.length === 1
         ? (translations[0]?.text ?? "")
         : translations
-            .map(({ pageNumber, text: translation }) => `페이지 ${pageNumber}\n${translation}`)
+            .map(({ pageNumber, text: translation }) => `Page ${pageNumber}\n${translation}`)
             .join("\n\n──────────\n\n");
     try {
       await navigator.clipboard.writeText(text);
-      this.#status.textContent = "번역을 클립보드에 복사했습니다.";
+      this.#status.textContent = "Translation copied to the clipboard.";
       this.#status.hidden = false;
     } catch (error) {
       this.#requestErrors.set(
         this.#pageNumbers[0] ?? 1,
-        `번역을 복사하지 못했습니다: ${errorMessage(error)}`,
+        `Could not copy translation: ${errorMessage(error)}`,
       );
       this.#render();
     }
@@ -409,7 +409,10 @@ export class TranslationPanel {
     this.#setFileCacheState("");
     try {
       const count = await this.#actions.exportDocumentTranslations();
-      this.#setFileCacheState(`${count}개 페이지 번역을 텍스트 파일로 내보냈습니다.`, "success");
+      this.#setFileCacheState(
+        `Exported translations from ${count} ${count === 1 ? "page" : "pages"}.`,
+        "success",
+      );
     } catch (error) {
       this.#setFileCacheState(errorMessage(error), "error");
     } finally {
@@ -419,7 +422,7 @@ export class TranslationPanel {
 
   async #clearDocumentTranslations(): Promise<void> {
     const confirmed = window.confirm(
-      "현재 PDF에 저장된 모든 페이지 번역을 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+      "Delete every cached page translation for this PDF? This cannot be undone.",
     );
     if (!confirmed) return;
     this.#setFileActionBusy(true);
@@ -431,8 +434,8 @@ export class TranslationPanel {
       this.#render();
       this.#setFileCacheState(
         count > 0
-          ? `${count}개 페이지의 저장된 번역을 삭제했습니다.`
-          : "삭제할 저장된 번역이 없습니다.",
+          ? `Deleted ${count} cached ${count === 1 ? "translation" : "translations"}.`
+          : "No cached translations to delete.",
         "success",
       );
     } catch (error) {
@@ -459,7 +462,7 @@ export class TranslationPanel {
     const key = this.#keyInput.value.trim();
     if (key.length < 20) {
       this.#keyState.dataset.kind = "error";
-      this.#keyState.textContent = `${this.#provider().displayName} API 키를 확인하세요.`;
+      this.#keyState.textContent = `Check the ${this.#provider().displayName} API key.`;
       this.#keyInput.focus();
       return;
     }
@@ -515,7 +518,9 @@ export class TranslationPanel {
     if (this.#busy) return;
     const targetLanguage = normalizedTargetLanguage(this.#targetLanguageInput.value);
     if (!targetLanguage) {
-      this.#targetLanguageInput.setCustomValidity("언어명 또는 BCP 47 코드를 2~60자로 입력하세요.");
+      this.#targetLanguageInput.setCustomValidity(
+        "Enter a language name or BCP 47 code using 2–60 characters.",
+      );
       this.#targetLanguageInput.reportValidity();
       return;
     }
@@ -571,7 +576,7 @@ export class TranslationPanel {
     );
     const errors = this.#pageNumbers.flatMap((pageNumber) => {
       const message = this.#requestErrors.get(pageNumber);
-      return message ? [`페이지 ${pageNumber}: ${message}`] : [];
+      return message ? [`Page ${pageNumber}: ${message}`] : [];
     });
     const state = this.#busy
       ? "busy"
@@ -599,8 +604,8 @@ export class TranslationPanel {
     this.#keyDelete.hidden = !hasKey;
     this.#keyState.dataset.kind = "ready";
     this.#keyState.textContent = hasKey
-      ? `${provider.displayName} 키 사용 준비됨 · 탭을 닫으면 삭제됩니다.`
-      : `${provider.displayName} 키가 아직 없습니다.`;
+      ? `${provider.displayName} key ready · cleared when this tab closes.`
+      : `No ${provider.displayName} key in this tab.`;
 
     this.#status.hidden = true;
     this.#errorBox.hidden = errors.length === 0;
@@ -611,24 +616,24 @@ export class TranslationPanel {
 
     if (this.#busy) {
       this.#composerLabel.textContent =
-        this.#busyPages.size > 1 ? `${this.#busyPages.size}페이지 번역 중…` : "번역 중…";
+        this.#busyPages.size > 1 ? `Translating ${this.#busyPages.size} pages…` : "Translating…";
       return;
     }
     if (errors.length > 0) {
-      this.#composerLabel.textContent = "실패한 페이지 다시 시도";
+      this.#composerLabel.textContent = "Retry failed pages";
       return;
     }
     const allTranslated = this.#pageNumbers.every((pageNumber) =>
       this.#translations.has(pageNumber),
     );
-    const pageLabel = this.#pageNumbers.length > 1 ? `${this.#pageNumbers.length}페이지` : "페이지";
+    const pageLabel = this.#pageNumbers.length > 1 ? `${this.#pageNumbers.length} pages` : "page";
     if (allTranslated) {
-      this.#composerLabel.textContent = `현재 ${pageLabel} 다시 번역`;
+      this.#composerLabel.textContent = `Translate current ${pageLabel} again`;
       return;
     }
     this.#composerLabel.textContent = hasKey
-      ? `현재 ${pageLabel} 번역`
-      : "API 키 설정하고 번역하기";
+      ? `Translate current ${pageLabel}`
+      : "Set API key to translate";
   }
 
   #renderPageResults(): void {
@@ -646,20 +651,20 @@ export class TranslationPanel {
       meta.className = "translation-page-meta";
       meta.textContent = translation
         ? this.#resultSummary(pageNumber, translation)
-        : `페이지 ${pageNumber}`;
+        : `Page ${pageNumber}`;
       const text = this.#root.ownerDocument.createElement("div");
       text.className = "translation-page-text";
       if (this.#busyPages.has(pageNumber)) {
         text.classList.add("is-status");
-        text.textContent = "페이지 이미지를 읽고 번역하고 있습니다…";
+        text.textContent = "Reading the page image and translating…";
       } else if (translation) {
         text.textContent = translation.text;
       } else if (this.#requestErrors.has(pageNumber)) {
         text.classList.add("is-status");
-        text.textContent = "번역하지 못했습니다.";
+        text.textContent = "Translation failed.";
       } else {
         text.classList.add("is-status");
-        text.textContent = "저장된 번역이 없습니다.";
+        text.textContent = "No saved translation.";
       }
       section.append(meta, text);
       nodes.push(section);
@@ -675,8 +680,8 @@ export class TranslationPanel {
     const usage =
       inputTokens === undefined && outputTokens === undefined
         ? ""
-        : ` · ${inputTokens ?? "?"} 입력 / ${outputTokens ?? "?"} 출력 토큰`;
-    return `페이지 ${pageNumber} · ${source} · 캐시됨${usage}`;
+        : ` · ${inputTokens ?? "?"} input / ${outputTokens ?? "?"} output tokens`;
+    return `Page ${pageNumber} · ${source} · cached${usage}`;
   }
 
   #syncProviderUi(): void {
@@ -694,11 +699,11 @@ export class TranslationPanel {
     this.#targetLanguageInput.value = this.#targetLanguage;
     this.#keyLabel.textContent = `${provider.displayName} API key`;
     this.#apiKeyLink.href = provider.apiKeyUrl;
-    this.#apiKeyLink.textContent = `${provider.displayName} API 키 받기 ↗`;
+    this.#apiKeyLink.textContent = `Get ${provider.displayName} API key ↗`;
     this.#keyInput.placeholder = provider.apiKeyPlaceholder;
     this.#keyDescription.textContent =
-      `키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. ` +
-      `번역할 때 표시된 페이지 이미지와 번역 지시문이 ${provider.displayName}로 전송됩니다.`;
+      `The key stays only in this viewer tab's memory and is never saved. ` +
+      `When you translate, the visible page image and translation instructions are sent to ${provider.displayName}.`;
   }
 
   #renderThemeButton(): void {
@@ -708,7 +713,7 @@ export class TranslationPanel {
         (TRANSLATION_OVERLAY_THEMES.indexOf(this.#theme) + 1) % TRANSLATION_OVERLAY_THEMES.length
       ] ?? "balanced";
     const next = TRANSLATION_OVERLAY_THEME_UI[nextTheme];
-    const label = `번역 배경: ${theme.label} · 누르면 ${next.label}`;
+    const label = `Translation background: ${theme.label} · click for ${next.label}`;
     this.#root.dataset.translationTheme = this.#theme;
     this.#themeButton.dataset.translationTheme = this.#theme;
     this.#themeButton.setAttribute("aria-label", label);
@@ -723,7 +728,7 @@ export class TranslationPanel {
         (TRANSLATION_PANEL_WIDTHS.indexOf(this.#panelWidth) + 1) % TRANSLATION_PANEL_WIDTHS.length
       ] ?? "balanced";
     const next = TRANSLATION_PANEL_WIDTH_UI[nextWidth];
-    const label = `번역 창 너비: ${width.label} · 누르면 ${next.label}`;
+    const label = `Translation panel width: ${width.label} · click for ${next.label}`;
     this.#root.dataset.translationWidth = this.#panelWidth;
     this.#root.style.width = `min(100vw, ${width.cssWidth})`;
     this.#widthButton.dataset.translationWidth = this.#panelWidth;
@@ -739,7 +744,7 @@ export class TranslationPanel {
         (TRANSLATION_FONT_SIZES.indexOf(this.#fontSize) + 1) % TRANSLATION_FONT_SIZES.length
       ] ?? "balanced";
     const next = TRANSLATION_FONT_SIZE_UI[nextFontSize];
-    const label = `번역 글자 크기: ${fontSize.label} · 누르면 ${next.label}`;
+    const label = `Translation font size: ${fontSize.label} · click for ${next.label}`;
     this.#root.dataset.translationFontSize = this.#fontSize;
     this.#fontSizeButton.dataset.translationFontSize = this.#fontSize;
     this.#fontSizeButton.setAttribute("aria-label", label);
@@ -751,7 +756,7 @@ export class TranslationPanel {
     this.#autoButton.setAttribute("aria-pressed", String(this.#autoTranslate));
     this.#autoButton.setAttribute(
       "aria-label",
-      this.#autoTranslate ? "자동 번역 끄기" : "자동 번역 켜기",
+      this.#autoTranslate ? "Turn off automatic translation" : "Turn on automatic translation",
     );
   }
 
