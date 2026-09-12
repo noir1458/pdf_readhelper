@@ -53,6 +53,14 @@ export function pagedViewPages(
   return spreadStart + 1 <= totalPages ? [spreadStart, spreadStart + 1] : [spreadStart];
 }
 
+export function pageIndicatorText(
+  currentPage: number,
+  totalPages: number,
+  layout: PageLayout,
+): string {
+  return pagedViewPages(currentPage, totalPages, layout).join(", ");
+}
+
 export function pageTurnTarget(
   currentPage: number,
   totalPages: number,

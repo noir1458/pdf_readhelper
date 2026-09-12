@@ -503,7 +503,14 @@
         </div>
         <label class="page-field">
           <span class="sr-only">Current page</span>
-          <input id="page-input" type="number" min="1" value="1" aria-label="Current page" />
+          <input
+            id="page-input"
+            type="text"
+            inputmode="numeric"
+            maxlength="14"
+            value="1"
+            aria-label="Current page"
+          />
           <span>/ <span id="total-pages">0</span></span>
         </label>
       </nav>
@@ -764,7 +771,6 @@
         <section id="translation-workspace" class="translation-workspace">
           <div class="translation-conversation">
             <div class="translation-response-body">
-              <p id="translation-result-state" class="translation-result-state" hidden></p>
               <p id="translation-status" class="translation-status" aria-live="polite" hidden></p>
               <div id="translation-error" class="translation-error" role="alert" hidden>
                 <strong>번역하지 못했습니다</strong>

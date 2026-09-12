@@ -34,6 +34,7 @@ import {
 } from "./keyboard-shortcuts";
 import { originalPdfBlob, printOriginalPdf } from "./original-document";
 import {
+  pageIndicatorText,
   pagedViewPages,
   pageTurnShortcutDirection,
   pageTurnTarget,
@@ -139,7 +140,7 @@ let renderObserver: IntersectionObserver | null = null;
 let dragDepth = 0;
 let activeDocumentId: string | null = null;
 let positionSaveTimer = 0;
-let translationRequestController: AbortController | null = null;
+const translationRequestControllers = new Map<number, AbortController>();
 let topbarCollapseTimer = 0;
 let sidebarCollapseTimer = 0;
 let fitRequestGeneration = 0;
@@ -197,10 +198,9 @@ const translationPanel = new TranslationPanel(
   DEFAULT_TRANSLATION_PROVIDER_ID,
   {
     translate: requestPageTranslation,
-    selectionChanged: (providerId, modelId, targetLanguage, pageNumber) => {
-      translationRequestController?.abort();
-      translationRequestController = null;
-      void loadCachedTranslation(pageNumber, providerId, modelId, targetLanguage);
+    selectionChanged: (providerId, modelId, targetLanguage, pageNumbers) => {
+      abortTranslationRequests();
+      void loadCachedTranslations(pageNumbers, providerId, modelId, targetLanguage);
     },
     openChanged: (open) => toolbar.setTranslationOpen(open),
   },
@@ -332,7 +332,7 @@ window.addEventListener("dragover", handleDragOver);
 window.addEventListener("dragleave", handleDragLeave);
 window.addEventListener("drop", handleDrop);
 window.addEventListener("beforeunload", () => {
-  translationRequestController?.abort();
+  abortTranslationRequests();
   searchController?.abort();
   flushReadingPosition();
   tracker.disconnect();
@@ -536,8 +536,7 @@ async function openBytes(
   source: PdfSource,
   options: OpenDocumentOptions = {},
 ): Promise<void> {
-  translationRequestController?.abort();
-  translationRequestController = null;
+  abortTranslationRequests();
   resetSearch();
   resetBookmarks();
   pageNavigationHistory.clear();
@@ -592,15 +591,14 @@ async function openBytes(
   observeRendering();
   tracker.observe([...slots.values()].map((slot) => slot.element));
   totalPages.textContent = String(pdfDocument.numPages);
-  pageInput.max = String(pdfDocument.numPages);
   updateCurrentPage(1);
   activeDocumentId = libraryId;
   pageNavigationHistory.reset(initialPage);
   updatePageHistoryButtons();
   documentSidebar.setActiveDocument(libraryId);
   if (translationPanel.isOpen) {
-    void loadCachedTranslation(
-      initialPage,
+    void loadCachedTranslations(
+      translationViewPages(),
       translationPanel.providerId,
       translationPanel.modelId,
       translationPanel.targetLanguage,
@@ -710,38 +708,63 @@ async function renderNear(pageNumber: number): Promise<void> {
 }
 
 function updateCurrentPage(pageNumber: number): void {
-  const pageChanged = session.snapshot.currentPage !== pageNumber;
+  const previousTranslationPages = translationViewPages();
   session.setCurrentPage(pageNumber);
+  const currentTranslationPages = translationViewPages();
+  const translationViewChanged = !samePages(previousTranslationPages, currentTranslationPages);
   updatePagedPageVisibility();
   tracker.setCurrentPage(pageNumber);
-  pageInput.value = String(pageNumber);
+  updatePageIndicator(currentTranslationPages);
   toolbar.setCurrentPage(pageNumber);
   documentSidebar.setCurrentPage(pageNumber);
   updateBookmarkButton();
   updatePageTurnButtons();
   scheduleReadingPositionSave(pageNumber);
   renderer?.releaseDistant(pageNumber);
-  if (translationPanel.isOpen) {
-    if (pageChanged) {
-      translationRequestController?.abort();
-      translationRequestController = null;
-    }
-    void loadCachedTranslation(
-      pageNumber,
+  if (translationPanel.isOpen && translationViewChanged) {
+    abortTranslationRequests();
+    void loadCachedTranslations(
+      currentTranslationPages,
       translationPanel.providerId,
       translationPanel.modelId,
       translationPanel.targetLanguage,
-      pageChanged && translationPanel.autoTranslateEnabled,
+      translationPanel.autoTranslateEnabled,
     );
   }
 }
 
 function navigateFromInput(): void {
-  const target = Number(pageInput.value);
+  const target = Number(/^\s*(\d+)/.exec(pageInput.value)?.[1]);
   if (!navigateToPage(target)) {
-    pageInput.value = String(session.snapshot.currentPage);
+    updatePageIndicator();
     toast.show(`Page must be between 1 and ${session.snapshot.totalPages}.`, "error");
   }
+}
+
+function translationViewPages(currentPage = session.snapshot.currentPage): number[] {
+  return pagedViewPages(
+    currentPage,
+    session.snapshot.totalPages,
+    session.snapshot.pageLayout,
+  );
+}
+
+function updatePageIndicator(pageNumbers = translationViewPages()): void {
+  const indicator = pageIndicatorText(
+    session.snapshot.currentPage,
+    session.snapshot.totalPages,
+    session.snapshot.pageLayout,
+  );
+  pageInput.value = indicator;
+  pageInput.style.setProperty("--page-input-content-width", `${indicator.length}ch`);
+  pageInput.setAttribute(
+    "aria-label",
+    pageNumbers.length > 1 ? `Current pages ${pageNumbers.join(" and ")}` : "Current page",
+  );
+}
+
+function samePages(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((pageNumber, index) => pageNumber === right[index]);
 }
 
 function navigateToPage(
@@ -1074,12 +1097,11 @@ async function removeSavedDocument(id: string): Promise<void> {
     updateBookmarkButton();
   }
   if (!activeDocumentId) {
-    translationPanel.showPage(
+    translationPanel.showPages(
       translationPanel.providerId,
       translationPanel.modelId,
       translationPanel.targetLanguage,
-      session.snapshot.currentPage,
-      null,
+      translationViewPages().map((pageNumber) => ({ pageNumber, translation: null })),
     );
   }
   await refreshDocumentLibrary();
@@ -1373,8 +1395,20 @@ function togglePageLayout(): void {
   if (!renderer) return;
   fitRequestGeneration += 1;
   const pageNumber = session.snapshot.currentPage;
+  const previousTranslationPages = translationViewPages();
   session.setPageLayout(session.snapshot.pageLayout === "single" ? "spread" : "single");
   updatePageLayout();
+  const currentTranslationPages = translationViewPages();
+  updatePageIndicator(currentTranslationPages);
+  if (translationPanel.isOpen && !samePages(previousTranslationPages, currentTranslationPages)) {
+    abortTranslationRequests();
+    void loadCachedTranslations(
+      currentTranslationPages,
+      translationPanel.providerId,
+      translationPanel.modelId,
+      translationPanel.targetLanguage,
+    );
+  }
   const fitMode = fitModeForZoomMode(session.snapshot.zoomMode);
   if (fitMode) void fitPage(fitMode);
   scheduleViewStateSave();
@@ -1568,44 +1602,54 @@ function toggleTranslationPanel(): void {
     translationPanel.close();
     return;
   }
-  const pageNumber = session.snapshot.currentPage;
-  translationPanel.open(pageNumber);
-  void loadCachedTranslation(
-    pageNumber,
+  const pageNumbers = translationViewPages();
+  translationPanel.open(pageNumbers);
+  void loadCachedTranslations(
+    pageNumbers,
     translationPanel.providerId,
     translationPanel.modelId,
     translationPanel.targetLanguage,
   );
 }
 
-async function loadCachedTranslation(
-  pageNumber: number,
+async function loadCachedTranslations(
+  pageNumbers: readonly number[],
   providerId: TranslationProviderId,
   modelId: string,
   targetLanguage: string,
   autoTranslateIfMissing = false,
 ): Promise<void> {
+  const requestedPages = [...pageNumbers];
   const documentId = activeDocumentId;
-  translationPanel.showPage(providerId, modelId, targetLanguage, pageNumber, null);
+  translationPanel.showPages(
+    providerId,
+    modelId,
+    targetLanguage,
+    requestedPages.map((pageNumber) => ({ pageNumber, translation: null })),
+  );
   if (!documentId) return;
   const provider = translationProvider(providerId);
   translationModel(provider, modelId);
   try {
-    const translation = await translationCache.get(documentId, pageNumber);
+    const translations = await Promise.all(
+      requestedPages.map(async (pageNumber) => ({
+        pageNumber,
+        translation: await translationCache.get(documentId, pageNumber),
+      })),
+    );
     if (
       translationPanel.isOpen &&
       translationPanel.providerId === providerId &&
       translationPanel.modelId === modelId &&
       translationPanel.targetLanguage === targetLanguage &&
       activeDocumentId === documentId &&
-      session.snapshot.currentPage === pageNumber
+      samePages(translationViewPages(), requestedPages)
     ) {
-      translationPanel.showPage(
+      translationPanel.showPages(
         providerId,
         modelId,
         targetLanguage,
-        pageNumber,
-        translation,
+        translations,
         autoTranslateIfMissing,
       );
     }
@@ -1614,7 +1658,7 @@ async function loadCachedTranslation(
       providerId,
       modelId,
       targetLanguage,
-      pageNumber,
+      requestedPages,
       "저장된 번역을 불러오지 못했습니다.",
     );
   }
@@ -1630,9 +1674,9 @@ async function requestPageTranslation(
   const documentId = activeDocumentId;
   if (!documentId) throw new UserFacingError("번역할 PDF가 열려 있지 않습니다.");
   const pdfDocument = session.requireDocument();
-  translationRequestController?.abort();
+  translationRequestControllers.get(pageNumber)?.abort();
   const controller = new AbortController();
-  translationRequestController = controller;
+  translationRequestControllers.set(pageNumber, controller);
   const provider = translationProvider(providerId);
   translationModel(provider, modelId);
   try {
@@ -1657,8 +1701,15 @@ async function requestPageTranslation(
       result.usage,
     );
   } finally {
-    if (translationRequestController === controller) translationRequestController = null;
+    if (translationRequestControllers.get(pageNumber) === controller) {
+      translationRequestControllers.delete(pageNumber);
+    }
   }
+}
+
+function abortTranslationRequests(): void {
+  for (const controller of translationRequestControllers.values()) controller.abort();
+  translationRequestControllers.clear();
 }
 
 async function copyPage(): Promise<void> {

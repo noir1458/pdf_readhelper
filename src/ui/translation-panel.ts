@@ -8,6 +8,11 @@ import {
 
 type TranslationOverlayTheme = "clear" | "balanced" | "dark";
 
+export type TranslationPageResult = {
+  pageNumber: number;
+  translation: CachedPageTranslation | null;
+};
+
 const TARGET_LANGUAGE_PATTERN = /^[\p{L}\p{M}\p{N} ,()._-]{2,60}$/u;
 const AUTO_TRANSLATION_DELAY_MS = 650;
 const TRANSLATION_OVERLAY_THEMES: readonly TranslationOverlayTheme[] = [
@@ -45,7 +50,7 @@ export type TranslationPanelActions = {
     providerId: TranslationProviderId,
     modelId: string,
     targetLanguage: string,
-    pageNumber: number,
+    pageNumbers: readonly number[],
   ) => void;
   openChanged: (open: boolean) => void;
 };
@@ -70,7 +75,6 @@ export class TranslationPanel {
   readonly #keySubmit: HTMLButtonElement;
   readonly #keyDelete: HTMLButtonElement;
   readonly #keyState: HTMLElement;
-  readonly #resultState: HTMLElement;
   readonly #keyDescription: HTMLElement;
   readonly #apiKeyLink: HTMLAnchorElement;
   readonly #status: HTMLElement;
@@ -85,11 +89,12 @@ export class TranslationPanel {
   #targetLanguage = DEFAULT_TRANSLATION_LANGUAGE;
   #theme: TranslationOverlayTheme = "balanced";
   #autoTranslate = false;
-  #autoRequestPending = false;
+  #autoRequestPages: number[] = [];
   #autoRequestTimer = 0;
-  #pageNumber = 1;
-  #translation: CachedPageTranslation | null = null;
-  #requestError: string | null = null;
+  #pageNumbers = [1];
+  #translations = new Map<number, CachedPageTranslation>();
+  #requestErrors = new Map<number, string>();
+  #busyPages = new Set<number>();
   #busy = false;
 
   constructor(
@@ -128,7 +133,6 @@ export class TranslationPanel {
     this.#keySubmit = this.#require<HTMLButtonElement>("#translation-key-submit");
     this.#keyDelete = this.#require<HTMLButtonElement>("#delete-translation-key");
     this.#keyState = this.#require("#translation-key-state");
-    this.#resultState = this.#require("#translation-result-state");
     this.#keyDescription = this.#require("#translation-key-description");
     this.#apiKeyLink = this.#require<HTMLAnchorElement>("#translation-api-key-link");
     this.#status = this.#require("#translation-status");
@@ -172,14 +176,20 @@ export class TranslationPanel {
     );
     this.#require<HTMLButtonElement>("#retry-translation").addEventListener(
       "click",
-      () => void this.#requestTranslation(),
+      () => void this.#requestTranslation(this.#retryPages()),
     );
     this.#require<HTMLButtonElement>("#error-translation-settings").addEventListener("click", () =>
       this.#openSettings(!this.#apiKeys.has(this.#providerId)),
     );
     this.#keyDelete.addEventListener("click", () => this.#clearKey());
     this.#keyForm.addEventListener("submit", (event) => this.#saveKey(event));
-    this.#translateButton.addEventListener("click", () => void this.#requestTranslation());
+    this.#translateButton.addEventListener(
+      "click",
+      () =>
+        void this.#requestTranslation(
+          this.#requestErrors.size > 0 ? this.#retryPages() : this.#pageNumbers,
+        ),
+    );
     this.#copyButton.addEventListener("click", () => void this.#copyTranslation());
     document.addEventListener("pointerdown", (event) => this.#closeSettingsFromOutside(event));
     document.addEventListener("keydown", (event) => this.#handleEscape(event));
@@ -208,8 +218,8 @@ export class TranslationPanel {
     return this.#autoTranslate;
   }
 
-  open(pageNumber: number): void {
-    this.#pageNumber = pageNumber;
+  open(pageNumbers: readonly number[]): void {
+    this.#setPageNumbers(pageNumbers);
     this.#root.hidden = false;
     this.#render();
     this.#actions.openChanged(true);
@@ -223,30 +233,28 @@ export class TranslationPanel {
     this.#actions.openChanged(false);
   }
 
-  showPage(
+  showPages(
     providerId: TranslationProviderId,
     modelId: string,
     targetLanguage: string,
-    pageNumber: number,
-    translation: CachedPageTranslation | null,
+    pages: readonly TranslationPageResult[],
     autoTranslateIfMissing = false,
   ): void {
-    if (
-      providerId !== this.#providerId ||
-      modelId !== this.modelId ||
-      targetLanguage !== this.#targetLanguage
-    ) {
-      return;
-    }
-    this.#pageNumber = pageNumber;
-    this.#translation = translation;
-    this.#requestError = null;
+    if (!this.#matchesSelection(providerId, modelId, targetLanguage)) return;
+    this.#setPageNumbers(pages.map(({ pageNumber }) => pageNumber));
+    this.#translations = new Map(
+      pages.flatMap(({ pageNumber, translation }) =>
+        translation ? ([[pageNumber, translation]] as const) : [],
+      ),
+    );
+    this.#requestErrors.clear();
+    this.#busyPages.clear();
     this.#render();
+    const missingPages = autoTranslateIfMissing
+      ? pages.filter(({ translation }) => !translation).map(({ pageNumber }) => pageNumber)
+      : [];
     this.#scheduleAutoRequest(
-      autoTranslateIfMissing &&
-        translation === null &&
-        this.#autoTranslate &&
-        this.#apiKeys.has(this.#providerId),
+      this.#autoTranslate && this.#apiKeys.has(this.#providerId) ? missingPages : [],
     );
   }
 
@@ -254,20 +262,27 @@ export class TranslationPanel {
     providerId: TranslationProviderId,
     modelId: string,
     targetLanguage: string,
-    pageNumber: number,
+    pageNumbers: readonly number[],
     message: string,
   ): void {
-    if (!this.#matches(providerId, modelId, targetLanguage, pageNumber)) return;
-    this.#requestError = message;
+    if (!this.#matchesSelection(providerId, modelId, targetLanguage)) return;
+    const visiblePages = pageNumbers.filter((pageNumber) => this.#pageNumbers.includes(pageNumber));
+    if (visiblePages.length === 0) return;
+    for (const pageNumber of visiblePages) this.#requestErrors.set(pageNumber, message);
     this.#render();
   }
 
-  async #requestTranslation(): Promise<void> {
+  async #requestTranslation(pageNumbers: readonly number[]): Promise<void> {
     if (this.#busy) return;
     this.#cancelPendingAutoRequest();
+    const requestedPages = [...new Set(pageNumbers)].filter((pageNumber) =>
+      this.#pageNumbers.includes(pageNumber),
+    );
+    if (requestedPages.length === 0) return;
     const apiKey = this.#apiKeys.get(this.#providerId);
     if (!apiKey) {
-      this.#requestError = `${this.#provider().displayName} API 키가 필요합니다. 설정에서 키를 입력하세요.`;
+      const message = `${this.#provider().displayName} API 키가 필요합니다. 설정에서 키를 입력하세요.`;
+      for (const pageNumber of requestedPages) this.#requestErrors.set(pageNumber, message);
       this.#render();
       this.#openSettings(true);
       return;
@@ -276,60 +291,71 @@ export class TranslationPanel {
     const requestedProviderId = this.#providerId;
     const requestedModelId = this.modelId;
     const requestedTargetLanguage = this.#targetLanguage;
-    const requestedPage = this.#pageNumber;
-    const previous = this.#translation;
-    this.#requestError = null;
+    for (const pageNumber of requestedPages) this.#requestErrors.delete(pageNumber);
+    this.#busyPages = new Set(requestedPages);
     this.#busy = true;
     this.#render();
 
     try {
-      const translation = await this.#actions.translate(
-        requestedProviderId,
-        requestedModelId,
-        requestedTargetLanguage,
-        requestedPage,
-        apiKey,
-      );
-      if (
-        this.#matches(requestedProviderId, requestedModelId, requestedTargetLanguage, requestedPage)
-      ) {
-        this.#translation = translation;
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        if (
-          this.#matches(
+      const results = await Promise.allSettled(
+        requestedPages.map((pageNumber) =>
+          this.#actions.translate(
             requestedProviderId,
             requestedModelId,
             requestedTargetLanguage,
-            requestedPage,
-          )
-        ) {
-          this.#translation = previous;
-        }
+            pageNumber,
+            apiKey,
+          ),
+        ),
+      );
+      if (
+        !this.#matchesSelection(
+          requestedProviderId,
+          requestedModelId,
+          requestedTargetLanguage,
+        )
+      ) {
         return;
       }
-      if (
-        this.#matches(requestedProviderId, requestedModelId, requestedTargetLanguage, requestedPage)
-      ) {
-        this.#translation = previous;
-        this.#requestError = errorMessage(error);
+      for (const [index, result] of results.entries()) {
+        const pageNumber = requestedPages[index];
+        if (pageNumber === undefined || !this.#pageNumbers.includes(pageNumber)) continue;
+        if (result.status === "fulfilled") {
+          this.#translations.set(pageNumber, result.value);
+          this.#requestErrors.delete(pageNumber);
+        } else if (!(result.reason instanceof Error && result.reason.name === "AbortError")) {
+          this.#requestErrors.set(pageNumber, errorMessage(result.reason));
+        }
       }
     } finally {
       this.#busy = false;
+      this.#busyPages.clear();
       this.#render();
       this.#runPendingAutoRequest();
     }
   }
 
   async #copyTranslation(): Promise<void> {
-    if (!this.#translation) return;
+    const translations = this.#pageNumbers.flatMap((pageNumber) => {
+      const translation = this.#translations.get(pageNumber);
+      return translation ? [{ pageNumber, text: translation.text }] : [];
+    });
+    if (translations.length === 0) return;
+    const text =
+      translations.length === 1
+        ? (translations[0]?.text ?? "")
+        : translations
+            .map(({ pageNumber, text: translation }) => `페이지 ${pageNumber}\n${translation}`)
+            .join("\n\n──────────\n\n");
     try {
-      await navigator.clipboard.writeText(this.#translation.text);
+      await navigator.clipboard.writeText(text);
       this.#status.textContent = "번역을 클립보드에 복사했습니다.";
       this.#status.hidden = false;
     } catch (error) {
-      this.#requestError = `번역을 복사하지 못했습니다: ${errorMessage(error)}`;
+      this.#requestErrors.set(
+        this.#pageNumbers[0] ?? 1,
+        `번역을 복사하지 못했습니다: ${errorMessage(error)}`,
+      );
       this.#render();
     }
   }
@@ -345,16 +371,17 @@ export class TranslationPanel {
     }
     this.#apiKeys.set(this.#providerId, key);
     this.#keyInput.value = "";
-    this.#requestError = null;
+    this.#requestErrors.clear();
     this.#render();
     this.#closeSettings(true);
     this.#translateButton.focus();
   }
 
   #clearKey(): void {
+    this.#cancelPendingAutoRequest();
     this.#apiKeys.delete(this.#providerId);
     this.#keyInput.value = "";
-    this.#requestError = null;
+    this.#requestErrors.clear();
     this.#render();
     this.#keyInput.focus();
   }
@@ -363,8 +390,8 @@ export class TranslationPanel {
     if (this.#busy || providerId === this.#providerId) return;
     this.#cancelPendingAutoRequest();
     this.#providerId = providerId;
-    this.#translation = null;
-    this.#requestError = null;
+    this.#translations.clear();
+    this.#requestErrors.clear();
     this.#keyInput.value = "";
     this.#syncProviderUi();
     this.#render();
@@ -372,7 +399,7 @@ export class TranslationPanel {
       providerId,
       this.modelId,
       this.#targetLanguage,
-      this.#pageNumber,
+      this.#pageNumbers,
     );
   }
 
@@ -384,10 +411,10 @@ export class TranslationPanel {
     }
     this.#cancelPendingAutoRequest();
     this.#modelIds.set(provider.id, modelId);
-    this.#translation = null;
-    this.#requestError = null;
+    this.#translations.clear();
+    this.#requestErrors.clear();
     this.#render();
-    this.#actions.selectionChanged(provider.id, modelId, this.#targetLanguage, this.#pageNumber);
+    this.#actions.selectionChanged(provider.id, modelId, this.#targetLanguage, this.#pageNumbers);
   }
 
   #selectTargetLanguage(): void {
@@ -403,14 +430,14 @@ export class TranslationPanel {
     if (targetLanguage === this.#targetLanguage) return;
     this.#cancelPendingAutoRequest();
     this.#targetLanguage = targetLanguage;
-    this.#translation = null;
-    this.#requestError = null;
+    this.#translations.clear();
+    this.#requestErrors.clear();
     this.#render();
     this.#actions.selectionChanged(
       this.#providerId,
       this.modelId,
       targetLanguage,
-      this.#pageNumber,
+      this.#pageNumbers,
     );
   }
 
@@ -431,11 +458,18 @@ export class TranslationPanel {
   #render(): void {
     const provider = this.#provider();
     const hasKey = this.#apiKeys.has(provider.id);
+    const hasTranslation = this.#pageNumbers.some((pageNumber) =>
+      this.#translations.has(pageNumber),
+    );
+    const errors = this.#pageNumbers.flatMap((pageNumber) => {
+      const message = this.#requestErrors.get(pageNumber);
+      return message ? [`페이지 ${pageNumber}: ${message}`] : [];
+    });
     const state = this.#busy
       ? "busy"
-      : this.#requestError
+      : errors.length > 0
         ? "error"
-        : this.#translation
+        : hasTranslation
           ? "result"
           : "empty";
     this.#root.dataset.translationState = state;
@@ -455,44 +489,73 @@ export class TranslationPanel {
     this.#keyState.textContent = hasKey
       ? `${provider.displayName} 키 사용 준비됨 · 탭을 닫으면 삭제됩니다.`
       : `${provider.displayName} 키가 아직 없습니다.`;
-    this.#resultState.hidden = !this.#translation;
-    this.#resultState.textContent = this.#translation
-      ? this.#resultSummary(this.#translation)
-      : "";
 
     this.#status.hidden = true;
-    this.#errorBox.hidden = !this.#requestError;
-    this.#errorText.textContent = this.#requestError ?? "";
-    this.#resultActions.hidden = !this.#translation;
-    this.#copyButton.disabled = !this.#translation || this.#busy;
+    this.#errorBox.hidden = errors.length === 0;
+    this.#errorText.textContent = errors.join("\n");
+    this.#resultActions.hidden = !hasTranslation;
+    this.#copyButton.disabled = !hasTranslation || this.#busy;
+    this.#renderPageResults();
 
     if (this.#busy) {
-      this.#status.hidden = false;
-      this.#status.textContent = "페이지 이미지를 읽고 번역하고 있습니다…";
-      this.#output.textContent = this.#translation?.text ?? "";
-      this.#composerLabel.textContent = "번역 중…";
+      this.#composerLabel.textContent =
+        this.#busyPages.size > 1 ? `${this.#busyPages.size}페이지 번역 중…` : "번역 중…";
       return;
     }
-
-    if (this.#requestError) {
-      this.#output.textContent = this.#translation?.text ?? "";
-      this.#composerLabel.textContent = "다시 시도";
+    if (errors.length > 0) {
+      this.#composerLabel.textContent = "실패한 페이지 다시 시도";
       return;
     }
-
-    if (this.#translation) {
-      this.#output.textContent = this.#translation.text;
-      this.#composerLabel.textContent = "현재 페이지 다시 번역";
+    const allTranslated = this.#pageNumbers.every((pageNumber) =>
+      this.#translations.has(pageNumber),
+    );
+    const pageLabel = this.#pageNumbers.length > 1 ? `${this.#pageNumbers.length}페이지` : "페이지";
+    if (allTranslated) {
+      this.#composerLabel.textContent = `현재 ${pageLabel} 다시 번역`;
       return;
     }
-
-    this.#output.textContent = "";
     this.#composerLabel.textContent = hasKey
-      ? `페이지 ${this.#pageNumber} 번역하기`
+      ? `현재 ${pageLabel} 번역`
       : "API 키 설정하고 번역하기";
   }
 
-  #resultSummary(translation: CachedPageTranslation): string {
+  #renderPageResults(): void {
+    const nodes: HTMLElement[] = [];
+    for (const [index, pageNumber] of this.#pageNumbers.entries()) {
+      if (index > 0) {
+        const divider = this.#root.ownerDocument.createElement("hr");
+        divider.className = "translation-page-divider";
+        nodes.push(divider);
+      }
+      const section = this.#root.ownerDocument.createElement("section");
+      section.className = "translation-page-result";
+      const translation = this.#translations.get(pageNumber);
+      const meta = this.#root.ownerDocument.createElement("p");
+      meta.className = "translation-page-meta";
+      meta.textContent = translation
+        ? this.#resultSummary(pageNumber, translation)
+        : `페이지 ${pageNumber}`;
+      const text = this.#root.ownerDocument.createElement("div");
+      text.className = "translation-page-text";
+      if (this.#busyPages.has(pageNumber)) {
+        text.classList.add("is-status");
+        text.textContent = "페이지 이미지를 읽고 번역하고 있습니다…";
+      } else if (translation) {
+        text.textContent = translation.text;
+      } else if (this.#requestErrors.has(pageNumber)) {
+        text.classList.add("is-status");
+        text.textContent = "번역하지 못했습니다.";
+      } else {
+        text.classList.add("is-status");
+        text.textContent = "저장된 번역이 없습니다.";
+      }
+      section.append(meta, text);
+      nodes.push(section);
+    }
+    this.#output.replaceChildren(...nodes);
+  }
+
+  #resultSummary(pageNumber: number, translation: CachedPageTranslation): string {
     const provider = this.#providers.get(translation.providerId);
     const model = provider?.models.find(({ id }) => id === translation.model);
     const source = `${provider?.displayName ?? translation.providerId} · ${model?.displayName ?? translation.model} · ${translation.targetLanguage}`;
@@ -501,7 +564,7 @@ export class TranslationPanel {
       inputTokens === undefined && outputTokens === undefined
         ? ""
         : ` · ${inputTokens ?? "?"} 입력 / ${outputTokens ?? "?"} 출력 토큰`;
-    return `현재 결과 · 페이지 ${this.#pageNumber} · ${source} · 캐시됨${usage}`;
+    return `페이지 ${pageNumber} · ${source} · 캐시됨${usage}`;
   }
 
   #syncProviderUi(): void {
@@ -523,7 +586,7 @@ export class TranslationPanel {
     this.#keyInput.placeholder = provider.apiKeyPlaceholder;
     this.#keyDescription.textContent =
       `키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. ` +
-      `번역할 때 현재 페이지 이미지와 번역 지시문이 ${provider.displayName}로 전송됩니다.`;
+      `번역할 때 표시된 페이지 이미지와 번역 지시문이 ${provider.displayName}로 전송됩니다.`;
   }
 
   #renderThemeButton(): void {
@@ -552,21 +615,22 @@ export class TranslationPanel {
 
   #runPendingAutoRequest(): void {
     if (
-      !this.#autoRequestPending ||
+      this.#autoRequestPages.length === 0 ||
       this.#autoRequestTimer !== 0 ||
       this.#busy ||
       !this.isOpen
     ) {
       return;
     }
-    this.#autoRequestPending = false;
-    void this.#requestTranslation();
+    const pageNumbers = [...this.#autoRequestPages];
+    this.#autoRequestPages = [];
+    void this.#requestTranslation(pageNumbers);
   }
 
-  #scheduleAutoRequest(shouldRequest: boolean): void {
+  #scheduleAutoRequest(pageNumbers: readonly number[]): void {
     this.#cancelPendingAutoRequest();
-    if (!shouldRequest) return;
-    this.#autoRequestPending = true;
+    if (pageNumbers.length === 0) return;
+    this.#autoRequestPages = [...pageNumbers];
     this.#autoRequestTimer = window.setTimeout(() => {
       this.#autoRequestTimer = 0;
       this.#runPendingAutoRequest();
@@ -576,7 +640,19 @@ export class TranslationPanel {
   #cancelPendingAutoRequest(): void {
     window.clearTimeout(this.#autoRequestTimer);
     this.#autoRequestTimer = 0;
-    this.#autoRequestPending = false;
+    this.#autoRequestPages = [];
+  }
+
+  #retryPages(): number[] {
+    const failed = this.#pageNumbers.filter((pageNumber) => this.#requestErrors.has(pageNumber));
+    return failed.length > 0 ? failed : [...this.#pageNumbers];
+  }
+
+  #setPageNumbers(pageNumbers: readonly number[]): void {
+    const normalized = [...new Set(pageNumbers)].filter(
+      (pageNumber) => Number.isInteger(pageNumber) && pageNumber > 0,
+    );
+    this.#pageNumbers = normalized.length > 0 ? normalized : [1];
   }
 
   #toggleSettings(): void {
@@ -621,17 +697,15 @@ export class TranslationPanel {
     this.close();
   }
 
-  #matches(
+  #matchesSelection(
     providerId: TranslationProviderId,
     modelId: string,
     targetLanguage: string,
-    pageNumber: number,
   ): boolean {
     return (
       this.#providerId === providerId &&
       this.modelId === modelId &&
-      this.#targetLanguage === targetLanguage &&
-      this.#pageNumber === pageNumber
+      this.#targetLanguage === targetLanguage
     );
   }
 

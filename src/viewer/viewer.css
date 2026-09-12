@@ -287,7 +287,7 @@ button:disabled {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 5px;
+  gap: 4px;
   color: #eef1f4;
 }
 .toolbar-overflow-menu .overflow-label {
@@ -521,9 +521,9 @@ button:disabled {
   white-space: nowrap;
 }
 .page-field input {
-  width: 56px;
+  width: clamp(40px, calc(var(--page-input-content-width, 1ch) + 10px), 72px);
   height: 34px;
-  padding: 0 6px;
+  padding: 0 3px;
   text-align: center;
   color: inherit;
   background: #111318;
@@ -1019,13 +1019,6 @@ button:disabled {
 .translation-response-body {
   min-width: 0;
 }
-.translation-result-state {
-  margin: 0 0 15px;
-  color: rgba(226, 230, 236, 0.78);
-  font-size: 10.5px;
-  line-height: 1.5;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
-}
 .translation-status {
   min-height: 17px;
   margin: 0 0 18px;
@@ -1089,8 +1082,28 @@ button:disabled {
     0 1px 3px rgba(0, 0, 0, 0.98),
     0 0 9px rgba(0, 0, 0, 0.72);
 }
-.translation-panel[data-translation-state="busy"] .translation-output {
+.translation-page-result {
+  min-width: 0;
+}
+.translation-page-meta {
+  margin: 0 0 15px;
+  color: rgba(226, 230, 236, 0.78);
+  font-size: 10.5px;
+  line-height: 1.5;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+}
+.translation-page-text {
+  white-space: pre-wrap;
+}
+.translation-page-text.is-status {
   color: #b8bdc6;
+}
+.translation-page-divider {
+  height: 1px;
+  margin: 32px 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.72);
 }
 .translation-result-actions {
   margin-top: 20px;

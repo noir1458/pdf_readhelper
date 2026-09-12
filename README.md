@@ -1,6 +1,6 @@
 # PDF Read Helper
 
-A private, local-first Chrome extension for reading, copying, extracting, and optionally translating PDF pages. PDF files stay local; an image of the current page is sent to the selected Gemini or OpenAI API only when the user explicitly requests a translation.
+A private, local-first Chrome extension for reading, copying, extracting, and optionally translating PDF pages. PDF files stay local; images of the currently visible page or spread are sent to the selected Gemini or OpenAI API only through a manual request or explicitly enabled AUTO mode.
 
 ## What it does
 
@@ -14,6 +14,7 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Current-page detection, page navigation history, zoom, fit-width, and fit-height
 - Clockwise page rotation shared by the viewer, IMG copy, and AI translation capture
 - Continuous single-column and book-style two-page spread layouts
+- Spread-aware `2, 3` current-page indicator and paired AI translation results
 - Persistent Original, Sepia, and Dark reading themes that affect display only
 - Selectable PDF text with native copy behavior
 - Full-document Ctrl/Command+F search with exact highlights and previous/next navigation
@@ -97,7 +98,7 @@ Authenticated, expiring, referrer-restricted, or special web viewers may not exp
 - Use the horizontal-arrow button to fit page width, the vertical-arrow button to fit page height, or the corner-marked page button to fit the locally detected content inside both dimensions. Content Fit preserves all detected content, centers it in the viewport, and falls back to fitting the complete page when margins are uncertain. In page-turn mode, the active Fit mode recalculates after the viewer area changes, such as a window resize.
 - Use the three-dot **More** button for less frequent view, navigation, theme, bookmark, search, download, print, and shortcut-help controls. Choose **? Shortcuts** for an in-viewer reference of every supported key. The panels close with their × button, Escape, or a click elsewhere. Ctrl/Command+F opens More and its search field automatically.
 - Use the curved-arrow button to rotate the document clockwise in 90° steps. Text selection, search highlights, links, IMG copy, and new AI translation requests follow the displayed rotation. Extracted PDF ranges retain their original page orientation.
-- Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. Clicking either page makes it the current IMG/AI/PDF target.
+- Use the two-sheet button to switch between a continuous single-page column and a two-page spread. In spread mode page 1 is centered alone as the cover, followed by 2–3, 4–5, and so on. The page field displays both visible pages as `2, 3`; clicking either sheet still makes it the current IMG/PDF/bookmark target, while AI operates on the complete visible spread.
 - Use the page-and-arrow button to switch between continuous scrolling and page-turn mode. Page-turn mode shows only the current page or cover-first spread, adds translucent previous/next buttons at the viewer edges, and supports Left/Right Arrow, Space, Shift+Space, Page Up, and Page Down. The selected flow persists locally across viewer tabs and browser restarts.
 - Use the left/right arrows to return through explicit page jumps made by thumbnails, the outline, bookmarks, search, PDF links, the page field, or Home/End. Ordinary scrolling is not added page by page; the actual page reached before the next jump becomes the return point. A new jump after going back clears the old forward branch, and opening another PDF resets the history.
 - Use the four-corner button or press **F** to enter focus mode. It requests browser fullscreen and temporarily hides the toolbar, sidebar, and translation panel without closing them. Press **F** or **Escape** to restore the previous layout. If Chrome refuses fullscreen, the distraction-free viewer mode still works.
@@ -136,13 +137,13 @@ The image comes from a new PDF.js render of the page. Before the final render, t
 
 Browser tabs, scrollbars, and extension controls are not captured. If the clipboard write fails, `page-N.png` is downloaded instead.
 
-### Translate the current page
+### Translate the current page or spread
 
 1. Click **AI / Translate** in the top toolbar.
 2. Open the gear menu, select **Gemini** or **OpenAI**, choose a model, and enter that provider's API key. The small provider-aware link opens the official key page. Each key remains only in this viewer tab's memory and is forgotten when the tab closes.
 3. Set the target language using a suggested value such as `Korean (ko)` or type any language name/BCP 47 code.
-4. Use the compact bottom translation action. The adjacent half-filled-circle control cycles the translation background through transparent, balanced, and strong states. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
-5. Optionally enable **AUTO**. While it is on and the translation panel is open, moving to another page waits 650 ms after the cache check and requests a translation only when that PDF page has no cached result. Moving again during that pause cancels the pending request. Hover or focus the button to see the per-page token/cost warning.
+4. Use the compact bottom translation action. In spread layout it requests both visible pages independently and shows the left-page result, a divider, then the right-page result. The adjacent half-filled-circle control cycles the translation background through transparent, balanced, and strong states. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
+5. Optionally enable **AUTO**. While it is on and the translation panel is open, moving to another page or spread waits 650 ms after the cache check and requests only the visible pages without cached results. Moving again during that pause cancels the pending request. Hover or focus the button to see the per-page token/cost warning.
 6. Read the target-language result in the right panel or copy it as text.
 
 Opening the panel, changing provider/model/language, cycling opacity, or moving pages with **AUTO** off never sends a request. Each PDF page keeps only its latest translation locally, including metadata that identifies the provider, model, and target language that produced it. Changing those settings does not duplicate or invalidate the page cache; pressing **Translate again** replaces that page's previous result. With **AUTO** on, each newly visited uncached page can create a billed request, while any already-cached page remains local-only. Request errors remain in the result conversation with retry and settings actions instead of disappearing with a toast.
@@ -213,14 +214,14 @@ For complete architecture, security policy, decisions, and current status, see [
 - `downloads`: save extracted PDFs and fallback PNGs
 - `commands`: keyboard shortcuts
 - `clipboardWrite`: write PNG after asynchronous page rendering
-- `http://*/*`, `https://*/*`, `file:///*`: fetch a user-chosen PDF URL and call the selected Gemini or OpenAI API after an explicit translation request
+- `http://*/*`, `https://*/*`, `file:///*`: fetch a user-chosen PDF URL and call the selected Gemini or OpenAI API after a manual translation request or through explicitly enabled AUTO mode
 
 There are no always-on content scripts and no passive browsing collection.
 
 ## Privacy
 
 - PDF processing happens in the browser.
-- Original PDF bytes are not uploaded. A prepared image of one page is uploaded to the selected Gemini or OpenAI API only when Translate is clicked.
+- Original PDF bytes are not uploaded. Prepared images of the visible page or two-page spread are uploaded separately to the selected Gemini or OpenAI API only when Translate is clicked or AUTO is enabled.
 - Saved PDF copies and reading positions stay in the extension's local IndexedDB.
 - Returned translations and token counts stay in a separate local IndexedDB cache.
 - No analytics or telemetry.
@@ -262,7 +263,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Open More → Shortcuts; verify the reference remains visible after More closes and closes with ×, Escape, and an outside click
 - [ ] Rotate through 90°, 180°, 270°, and 0°; verify canvas, text selection, search highlights, and links remain aligned
 - [ ] Copy and explicitly retranslate a rotated page; verify the generated image follows the displayed orientation while PDF Range remains original
-- [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and clicking the right sheet updates the page counter
+- [ ] Toggle the two-page spread; verify page 1 is alone, later pages pair correctly, fit-width fits each sheet, and the page field shows both pages as `2, 3`
 - [ ] Toggle page-turn mode in single and spread layouts; verify edge buttons, Left/Right, Space/Page Down, Shift+Space/Page Up, first/last boundaries, continuous-mode restoration, and persistence after reload
 - [ ] Switch among Original, Sepia, and Dark; reload the viewer to confirm persistence and verify IMG/AI/PDF/print outputs keep original colors
 - [ ] Use Space/PageDown, Shift+Space/PageUp, and Home/End over the PDF; confirm inputs, buttons, links, sidebar/translation content, and active text selections keep their native behavior
@@ -280,6 +281,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Confirm the highly translucent translation overlay leaves the original page visible underneath, does not resize the PDF, shows only translation content above the bottom controls, and keeps text readable over white/dark pages
 - [ ] Confirm provider/model/key controls and key readiness/deletion appear only in gear settings, while the cached result's page/provider/model/language/token provenance appears directly above the translation
 - [ ] Translate one page with each provider/model option and verify the selected target-language output and token counts
+- [ ] In spread layout, translate a pair and confirm both requests run independently, the left result appears above the divider, the right result appears below it, and each page retains its own cache/error/provenance state
 - [ ] Switch providers, models, and target languages, then revisit a translated page; confirm its one latest result remains, its creation metadata is visible above the result, and a new translation replaces it
 - [ ] Open/close the gear settings with its button, Escape, and an outside click; switch provider/model, use a suggested and custom BCP 47 target, follow each official API-key link, replace/delete each key, and confirm the result remains usable
 - [ ] Cycle all three opacity states from the bottom control; enable AUTO, hover/focus its cost warning, rapidly cross several pages, and confirm only the final settled uncached page triggers after the delay

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   normalizePageFlow,
   PAGE_FLOW_STORAGE_KEY,
+  pageIndicatorText,
   pagedViewPages,
   pageTurnShortcutDirection,
   pageTurnTarget,
@@ -54,6 +55,13 @@ describe("page flow", () => {
     expect(pagedViewPages(2, 8, "spread")).toEqual([2, 3]);
     expect(pagedViewPages(3, 8, "spread")).toEqual([2, 3]);
     expect(pagedViewPages(8, 8, "spread")).toEqual([8]);
+  });
+
+  it("shows both visible spread pages in the page indicator", () => {
+    expect(pageIndicatorText(1, 8, "spread")).toBe("1");
+    expect(pageIndicatorText(2, 8, "spread")).toBe("2, 3");
+    expect(pageIndicatorText(3, 8, "spread")).toBe("2, 3");
+    expect(pageIndicatorText(4, 8, "single")).toBe("4");
   });
 
   it("turns by one page or one cover-first spread", () => {
