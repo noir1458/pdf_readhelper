@@ -142,7 +142,7 @@ Browser tabs, scrollbars, and extension controls are not captured. If the clipbo
 1. Click **AI / Translate** in the top toolbar.
 2. Open the gear menu, select **Gemini** or **OpenAI**, choose a model, and enter that provider's API key. The small provider-aware link opens the official key page. Each key remains only in this viewer tab's memory and is forgotten when the tab closes.
 3. Set the target language using a suggested value such as `Korean (ko)` or type any language name/BCP 47 code.
-4. Use the compact bottom translation action. In spread layout it requests both visible pages independently and shows the left-page result, a divider, then the right-page result. The adjacent half-filled-circle control cycles the translation background through transparent, balanced, and strong states. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
+4. Use the compact bottom translation action. In spread layout it requests both visible pages independently and shows the left-page result, a divider, then the right-page result. Adjacent controls cycle the translation background, panel width, and result font size through three states each. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
 5. Optionally enable **AUTO**. While it is on and the translation panel is open, moving to another page or spread waits 650 ms after the cache check and requests only the visible pages without cached results. Moving again during that pause cancels the pending request. Hover or focus the button to see the per-page token/cost warning.
 6. Read the target-language result in the right panel or copy it as text.
 
@@ -284,7 +284,7 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] In spread layout, translate a pair and confirm both requests run independently, the left result appears above the divider, the right result appears below it, and each page retains its own cache/error/provenance state
 - [ ] Switch providers, models, and target languages, then revisit a translated page; confirm its one latest result remains, its creation metadata is visible above the result, and a new translation replaces it
 - [ ] Open/close the gear settings with its button, Escape, and an outside click; switch provider/model, use a suggested and custom BCP 47 target, follow each official API-key link, replace/delete each key, and confirm the result remains usable
-- [ ] Cycle all three opacity states from the bottom control; enable AUTO, hover/focus its cost warning, rapidly cross several pages, and confirm only the final settled uncached page triggers after the delay
+- [ ] Cycle all three opacity, panel-width, and result-font-size states from the bottom controls; enable AUTO, hover/focus its cost warning, rapidly cross several pages, and confirm only the final settled uncached page triggers after the delay
 - [ ] Use **Translate again**, **Copy translation**, inline **Retry**, inline **Check settings**, Escape, and the panel close button
 - [ ] Trigger a temporary Gemini failure and confirm the full error remains in the translation result instead of appearing only as a toast
 - [ ] Trigger a denied clipboard and confirm PNG fallback download

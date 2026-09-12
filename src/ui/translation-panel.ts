@@ -7,6 +7,8 @@ import {
 } from "../translation/translation-provider";
 
 type TranslationOverlayTheme = "clear" | "balanced" | "dark";
+type TranslationPanelWidth = "wide" | "balanced" | "narrow";
+type TranslationFontSize = "small" | "balanced" | "large";
 
 export type TranslationPageResult = {
   pageNumber: number;
@@ -27,6 +29,32 @@ const TRANSLATION_OVERLAY_THEME_UI: Record<
   clear: { label: "투명", indicator: "○" },
   balanced: { label: "균형", indicator: "◐" },
   dark: { label: "진하게", indicator: "●" },
+};
+const TRANSLATION_PANEL_WIDTHS: readonly TranslationPanelWidth[] = [
+  "balanced",
+  "wide",
+  "narrow",
+];
+const TRANSLATION_PANEL_WIDTH_UI: Record<
+  TranslationPanelWidth,
+  { label: string; indicator: string }
+> = {
+  wide: { label: "넓게", indicator: "↔" },
+  balanced: { label: "기본", indicator: "↔" },
+  narrow: { label: "좁게", indicator: "↔" },
+};
+const TRANSLATION_FONT_SIZES: readonly TranslationFontSize[] = [
+  "balanced",
+  "large",
+  "small",
+];
+const TRANSLATION_FONT_SIZE_UI: Record<
+  TranslationFontSize,
+  { label: string; indicator: string }
+> = {
+  small: { label: "작게", indicator: "A−" },
+  balanced: { label: "기본", indicator: "A" },
+  large: { label: "크게", indicator: "A+" },
 };
 
 /*
@@ -68,6 +96,10 @@ export class TranslationPanel {
   readonly #targetLanguageInput: HTMLInputElement;
   readonly #themeButton: HTMLButtonElement;
   readonly #themeIndicator: HTMLElement;
+  readonly #widthButton: HTMLButtonElement;
+  readonly #widthIndicator: HTMLElement;
+  readonly #fontSizeButton: HTMLButtonElement;
+  readonly #fontSizeIndicator: HTMLElement;
   readonly #autoButton: HTMLButtonElement;
   readonly #keyForm: HTMLFormElement;
   readonly #keyInput: HTMLInputElement;
@@ -88,6 +120,8 @@ export class TranslationPanel {
   #providerId: TranslationProviderId;
   #targetLanguage = DEFAULT_TRANSLATION_LANGUAGE;
   #theme: TranslationOverlayTheme = "balanced";
+  #panelWidth: TranslationPanelWidth = "balanced";
+  #fontSize: TranslationFontSize = "balanced";
   #autoTranslate = false;
   #autoRequestPages: number[] = [];
   #autoRequestTimer = 0;
@@ -126,6 +160,10 @@ export class TranslationPanel {
     this.#targetLanguageInput = this.#require<HTMLInputElement>("#translation-target-language");
     this.#themeButton = this.#require<HTMLButtonElement>("#cycle-translation-theme");
     this.#themeIndicator = this.#require("#translation-theme-indicator");
+    this.#widthButton = this.#require<HTMLButtonElement>("#cycle-translation-width");
+    this.#widthIndicator = this.#require("#translation-width-indicator");
+    this.#fontSizeButton = this.#require<HTMLButtonElement>("#cycle-translation-font-size");
+    this.#fontSizeIndicator = this.#require("#translation-font-size-indicator");
     this.#autoButton = this.#require<HTMLButtonElement>("#toggle-translation-auto");
     this.#keyForm = this.#require<HTMLFormElement>("#translation-key-form");
     this.#keyInput = this.#require<HTMLInputElement>("#translation-api-key");
@@ -166,6 +204,8 @@ export class TranslationPanel {
       }
     });
     this.#themeButton.addEventListener("click", () => this.#cycleTheme());
+    this.#widthButton.addEventListener("click", () => this.#cyclePanelWidth());
+    this.#fontSizeButton.addEventListener("click", () => this.#cycleFontSize());
     this.#autoButton.addEventListener("click", () => this.#toggleAutoTranslate());
     this.#settingsButton.addEventListener("click", () => this.#toggleSettings());
     this.#require<HTMLButtonElement>("#close-translation-settings").addEventListener("click", () =>
@@ -449,6 +489,22 @@ export class TranslationPanel {
     this.#renderThemeButton();
   }
 
+  #cyclePanelWidth(): void {
+    const currentIndex = TRANSLATION_PANEL_WIDTHS.indexOf(this.#panelWidth);
+    this.#panelWidth =
+      TRANSLATION_PANEL_WIDTHS[(currentIndex + 1) % TRANSLATION_PANEL_WIDTHS.length] ??
+      "balanced";
+    this.#renderWidthButton();
+  }
+
+  #cycleFontSize(): void {
+    const currentIndex = TRANSLATION_FONT_SIZES.indexOf(this.#fontSize);
+    this.#fontSize =
+      TRANSLATION_FONT_SIZES[(currentIndex + 1) % TRANSLATION_FONT_SIZES.length] ??
+      "balanced";
+    this.#renderFontSizeButton();
+  }
+
   #toggleAutoTranslate(): void {
     this.#autoTranslate = !this.#autoTranslate;
     if (!this.#autoTranslate) this.#cancelPendingAutoRequest();
@@ -475,6 +531,8 @@ export class TranslationPanel {
     this.#root.dataset.translationState = state;
     this.#root.dataset.translationTheme = this.#theme;
     this.#renderThemeButton();
+    this.#renderWidthButton();
+    this.#renderFontSizeButton();
     this.#renderAutoButton();
     this.#translateButton.disabled = this.#busy;
     this.#settingsButton.disabled = this.#busy;
@@ -603,6 +661,38 @@ export class TranslationPanel {
     this.#themeButton.setAttribute("aria-label", label);
     this.#themeButton.title = label;
     this.#themeIndicator.textContent = theme.indicator;
+  }
+
+  #renderWidthButton(): void {
+    const width = TRANSLATION_PANEL_WIDTH_UI[this.#panelWidth];
+    const nextWidth =
+      TRANSLATION_PANEL_WIDTHS[
+        (TRANSLATION_PANEL_WIDTHS.indexOf(this.#panelWidth) + 1) %
+          TRANSLATION_PANEL_WIDTHS.length
+      ] ?? "balanced";
+    const next = TRANSLATION_PANEL_WIDTH_UI[nextWidth];
+    const label = `번역 창 너비: ${width.label} · 누르면 ${next.label}`;
+    this.#root.dataset.translationWidth = this.#panelWidth;
+    this.#widthButton.dataset.translationWidth = this.#panelWidth;
+    this.#widthButton.setAttribute("aria-label", label);
+    this.#widthButton.title = label;
+    this.#widthIndicator.textContent = width.indicator;
+  }
+
+  #renderFontSizeButton(): void {
+    const fontSize = TRANSLATION_FONT_SIZE_UI[this.#fontSize];
+    const nextFontSize =
+      TRANSLATION_FONT_SIZES[
+        (TRANSLATION_FONT_SIZES.indexOf(this.#fontSize) + 1) %
+          TRANSLATION_FONT_SIZES.length
+      ] ?? "balanced";
+    const next = TRANSLATION_FONT_SIZE_UI[nextFontSize];
+    const label = `번역 글자 크기: ${fontSize.label} · 누르면 ${next.label}`;
+    this.#root.dataset.translationFontSize = this.#fontSize;
+    this.#fontSizeButton.dataset.translationFontSize = this.#fontSize;
+    this.#fontSizeButton.setAttribute("aria-label", label);
+    this.#fontSizeButton.title = label;
+    this.#fontSizeIndicator.textContent = fontSize.indicator;
   }
 
   #renderAutoButton(): void {
