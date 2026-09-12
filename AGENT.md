@@ -28,16 +28,16 @@ In the extension-owned viewer, the current page is determined from viewport posi
 
 Entering `2-11` validates the inclusive range, copies original page objects 2 through 11 with `@cantoo/pdf-lib`, and downloads a ten-page `2-11.pdf`. A single page uses `7.pdf`. It never rasterizes pages to build the PDF.
 
-### Flow C — Current page → Korean translation
+### Flow C — Current page → target-language translation
 
-Opening the right translation panel does not make a request. The user selects Gemini or OpenAI plus one of that provider's configured models, enters the provider API key for the current viewer tab, and explicitly clicks **Translate page**. The viewer uses the same locally cropped/resampled PNG pipeline as clipboard copy, sends one image with a translation instruction through the selected provider/model API, displays the Korean result, and caches it by provider, model, PDF fingerprint, page, and capture version. Revisiting a cached page does not create another request unless the user clicks **Translate again**.
+Opening the right translation panel does not make a request. The user selects Gemini or OpenAI plus one of that provider's configured models, sets a target using an editable language-name/BCP-47 field with common datalist suggestions, enters the provider API key for the current viewer tab, and explicitly clicks **Translate page**. The viewer uses the same locally cropped/resampled PNG pipeline as clipboard copy, sends one image with a shared English translation instruction naming the target language through the selected provider/model API, displays the result with its provenance prefix, and keeps one latest translation per PDF fingerprint and page. A later translation with different settings replaces it. An opt-in session-only AUTO control repeats that workflow after page navigation only when the destination has no cached result and remains selected for a 650 ms debounce; revisiting any cached page remains local-only.
 
 ## 4. Explicit Non-goals
 
 Initial versions do not include:
 
 - Persistent API-key storage, accounts, a backend, analytics, or telemetry
-- Automatic translation while scrolling or bulk whole-document translation
+- Background translation with the panel closed or bulk whole-document translation
 - OCR or text-layer extraction as the primary translation path
 - Translation providers beyond Gemini and OpenAI, arbitrary model selection, or a general LLM plugin system
 - Chrome Web Store optimization
@@ -111,7 +111,7 @@ pdf_readhelper/
 
 Responsibilities stay separated: loading/session state, visible rendering, page tracking, export rendering, extraction, clipboard, Chrome messaging, and UI components must not collapse into one large module.
 
-Gemini and OpenAI requests use the browser `fetch` API rather than bundling SDKs. A small provider contract isolates configured models and request/response parsing; the translation panel owns provider/model selection, provider-specific session keys, and UI state; the cache owns persisted translation records; the viewer coordinates those modules with the active document.
+Gemini and OpenAI requests use the browser `fetch` API rather than bundling SDKs. A small provider contract isolates configured models, official key-page URLs, and request/response parsing; the translation panel owns provider/model/target-language selection, provider-specific session keys, opacity and AUTO state, and UI state; the cache owns persisted translation records; the viewer coordinates those modules with the active document.
 
 ## 8. Chrome Permission Policy
 
@@ -151,7 +151,7 @@ No `storage`, `offscreen`, or `<all_urls>` content script is needed in the MVP. 
 
 `DocumentLibrary` owns persistent extension-local IndexedDB records. Metadata and file bytes use separate object stores so listing cover/title/page summaries does not read every saved PDF into memory. Each record includes a PDF fingerprint ID, source descriptor, title, small first-page thumbnail, total pages, last-read page, optional manual/Fit zoom state, rotation, single/spread layout, update timestamp, optional user-defined sort order, and locally cached PDF bytes. View state is optional for schema compatibility; legacy records receive safe defaults without an IndexedDB migration. Legacy records without a sort order remain newest-first until the user drags the list; new unordered documents appear before an existing manual sequence.
 
-`TranslationCache` owns a separate IndexedDB database keyed by capture version, provider, model, PDF fingerprint, and page. It stores translated text, token usage, provider/model identity, and update time, but never stores an API key or page image. Legacy OpenAI cache keys remain readable.
+`TranslationCache` owns a separate IndexedDB database keyed by capture version, PDF fingerprint, and page. It stores only the latest translated text plus token usage, provider/model/language provenance, and update time; a later request for that page overwrites the record regardless of settings. It never stores an API key or page image. The version-2 database upgrade collapses earlier provider/model/language-scoped records to the newest record for each document page and removes the superseded entries.
 
 `ReadingThemePicker` owns one viewer-wide `original`, `sepia`, or `dark` display preference in extension-page `localStorage`. It changes CSS presentation only and is intentionally separate from document state and exported content.
 
@@ -216,7 +216,7 @@ The top bar keeps its opening actions on the left and one compact page-control g
 - Previous/next view buttons traverse explicit page jumps from thumbnails, outline entries, bookmarks, search results, PDF links, the page field, and Home/End. Continuous scrolling does not flood the history; the actual page visible when the reader next jumps replaces that departure point. Opening another PDF clears the history.
 - Focus mode requests browser fullscreen and hides the complete top toolbar, sidebar, and translation panel while retaining their underlying open state for restoration. F or Escape exits; failure to obtain browser fullscreen leaves the in-page distraction-free mode active with a toast explanation.
 - Page flow toggles between the existing continuous stack and a persisted page-turn presentation. Paged flow reveals only the active page in single layout or the active cover-first pair in spread layout, centers short pages safely, retains scrolling for oversized/zoomed pages, and shows translucent edge turn buttons. Returning to continuous flow unhides the existing slots without recreating the document.
-- AI opens a translucent right overlay without narrowing the PDF viewport. Its main surface is a lightweight conversation: a fixed page-translation request, a long scrolling response, persistent inline request errors, and a bottom row containing Translate, Settings, and Close. A gear popover opens upward from that row and contains provider/model selection plus provider-specific key replacement/deletion, keeping configuration out of the reading flow. Translation never starts from scrolling, opening the panel, or switching providers/models. Each provider/model's cached result appears automatically and can be copied as text; explicit retranslation replaces only that selection's cached result.
+- AI opens a result-first translucent right overlay without narrowing the PDF viewport. Its main surface contains the cached result's page/provider/model/language/token provenance followed directly by the long scrolling translation, persistent inline request errors, and a more-transparent bottom row containing a compact Translate action, AUTO, three-state opacity, Settings, and Close; it does not repeat a header, page-request bubble, or AI badge. A gear popover opens upward from that row and contains provider/model selection, an editable target-language field with common suggestions, the provider's official API-key link, and key readiness/replacement/deletion. Opening the panel or changing settings never starts translation. AUTO is off by default and, while enabled, requests only a PDF page with no cached translation after a 650 ms settle delay; moving again cancels the pending timer, and its hover/focus help warns that each page may consume tokens and incur cost. Each page's single latest result appears automatically and can be copied as text; explicit retranslation replaces that page result regardless of provider/model/language.
 - More closes after direct actions, Escape, or an outside pointer action. Theme and search remain nested interactive popovers; shortcut help opens as an independent sibling panel so it remains visible after More closes. Ctrl/Command+F opens More before focusing search so the keyboard path remains visible and usable.
 - No `alert()`; use non-blocking accessible live-region toasts.
 
@@ -322,12 +322,12 @@ Unit tests cover:
 - per-page fit-width calculation for single-column and two-page spread layouts
 - saved-document title derivation
 - saved-document view defaults, validation, and legacy-record compatibility
-- Gemini GenerateContent and OpenAI Responses text/usage extraction plus provider-aware translation cache-key separation
+- Gemini GenerateContent and OpenAI Responses text/usage extraction plus one-latest-result-per-document-page cache separation
 - reading-key classification and overlap-preserving viewport offsets
 - focus-mode F/Escape shortcut classification and modifier preservation
 - PDF extraction using an in-memory generated fixture and output page-count/page-size checks
 
-Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, Gemini/OpenAI provider and model switching, provider/model-specific cached results and session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
+Manual Chrome matrix covers public URL, local picker/drop, one/10+/100+ pages, landscape/mixed sizes, invalid/encrypted PDF, clipboard PNG, Gemini/OpenAI provider/model/target-language switching, latest-result replacement and provenance, bottom three-state opacity control, opt-in cache-aware AUTO translation and its cost warning, official key links, session-key clearing, worker CSP, URL/file access, commands, and memory behavior.
 
 ## 26. Build / Verification Commands
 
@@ -390,13 +390,13 @@ npm run check
 - [x] Top document toolbar, accessible range popover, and toast feedback
 - [x] Independent current-page PNG rendering, clipboard write, and fallback download
 - [x] Local per-page neutral-margin detection, safe padded crop, full-page fallback, and 70% PNG resampling
-- [x] Translucent conversation-style Gemini/OpenAI overlay with bottom Translate/Settings/Close controls, gear-contained provider/model/key settings, persistent inline errors/retry, provider/model-specific local cache, token display, and translation copy
+- [x] Result-first Gemini/OpenAI overlay with compact bottom Translate/AUTO/opacity/Settings/Close controls, provider-aware key links, editable target language, persistent inline errors/retry, one latest cached translation per PDF page, and translation copy
 - [x] Animated auto-compacting top chrome with position-stable retained controls and an edge-revealed overlay sidebar
 - [x] Inclusive original-page PDF extraction with `7.pdf` / `2-11.pdf` naming
 - [x] README installation, usage, privacy, limitations, troubleshooting, and manual test runbook
 - [x] Removed unreliable GPT Send integration, its scripting permission, and its keyboard command
 - [x] Range popover close button, Escape close, and outside-click dismissal
-- [x] Automated typecheck, lint, 101 unit/integration tests, production build, and distribution manifest/asset validation
+- [x] Automated typecheck, lint, 102 unit/integration tests, production build, and distribution manifest/asset validation
 - [x] Fixed CSS `[hidden]` handling after live Chrome testing showed empty/drop overlays covering rendered pages
 - [x] Serialized per-page canvas rendering across document switches and zoom changes
 - [x] Consolidated navigation/page actions into one ordered control group and moved URL input into an on-demand popover
@@ -707,3 +707,35 @@ npm run check
 **Reason:** Header controls competed with the main toolbar and could be obscured. A translucent overlay preserves the full-size original underneath the translation, while localized contrast treatment keeps long Korean output readable without turning the whole panel opaque.
 
 **Consequences:** Opening AI no longer changes Fit dimensions or shifts the PDF. The overlay intentionally intercepts interaction in its right-side footprint while open; Close remains reachable at the bottom. Transparency and contrast over white, dark, scanned, and illustrated pages require manual Chrome tuning.
+
+### 2026-09-12 — Strip non-result chrome from translation
+
+**Decision:** Remove the panel title/page header, simulated PDF request bubble, AI badge, response card, and footer provider/model label. Reduce the overlay background opacity again, render translation text directly over the source with contrast shadows, and move key readiness plus cache/token details into gear settings alongside the provider and model controls.
+
+**Reason:** The fixed task is already clear from the AI toolbar action and bottom Translate control. Repeating chat-like labels and model metadata competes with both the translation and the source page, while the actual use case is fast reading rather than simulating a general chat product.
+
+**Consequences:** An untranslated page intentionally has an empty content surface. Progress and errors remain visible when relevant, while normal successful state shows only translated text and its copy action. Text contrast over varied source artwork remains a visual-tuning concern.
+
+### 2026-09-12 — Generalize translation language and overlay density
+
+**Decision:** Keep the translation request instructions in English and supply the target language as a separate language name or BCP 47 code. Offer common languages through an editable datalist instead of a closed language registry, include the normalized target language in cache identity, expose three session-only overlay-density choices, and link each provider's key control to its official API-key page.
+
+**Reason:** A fixed language dropdown would either omit valid languages or grow into a maintenance-heavy catalog, while a completely free-form field would make common choices needlessly awkward. Translation results for different targets must never share a cache entry, and source-page visibility needs to be adjustable for both sparse and visually busy pages.
+
+**Consequences:** `Korean (ko)` remains the default and may read the earlier Korean-only cache keys. Changing target language loads a separate cached result without sending a request; changing overlay density is purely visual. Target language, density, provider, model, and keys remain tab-memory state and are not persisted. Official key links open in a new browser tab.
+
+### 2026-09-12 — Put reading controls at hand and make AUTO cache-aware
+
+**Decision:** Remove overlay density from gear settings and replace it with a compact bottom control that cycles three visual states. Shrink the manual translation action and place an opt-in AUTO toggle directly beside it. After a real page change, AUTO first checks the document-page cache, waits for a 650 ms settle window, and requests only when no record exists; another page change cancels the pending timer, aborts an in-flight translation, and schedules only the new uncached page.
+
+**Reason:** Opacity is a frequent reading adjustment rather than provider configuration. Automatic translation is useful during sequential reading, but it must remain explicit, visibly enabled, cache-first, and accompanied by a token/cost warning.
+
+**Consequences:** AUTO defaults off, operates only while the translation panel is open, and remains session-only. Opening the panel, changing settings, cycling opacity, or revisiting the same current page does not activate it. Rapid page changes cancel unsent work during the delay; already-started obsolete requests receive an abort signal, and cached destinations never make a provider request. AUTO hover/focus help warns that each uncached page can consume tokens and incur provider charges.
+
+### 2026-09-12 — Keep one latest translation per PDF page
+
+**Decision:** Supersede provider/model/language-specific cache identity with one latest record keyed only by capture version, PDF fingerprint, and page. Preserve the provider, model, and target language as a provenance prefix directly above the translation, and let every successful retranslation overwrite the prior page result. AUTO treats any existing page result as cached regardless of the current settings.
+
+**Reason:** The intended reader normally translates a book into one native language with one preferred model. Retaining every experimental provider/model/language combination multiplies local records without helping the common workflow; if the reader deliberately changes language or model, explicitly retranslating that page is acceptable.
+
+**Consequences:** Changing provider, model, or target language shows the latest page result rather than creating or selecting another cache namespace. The result prefix identifies which configuration produced it. The IndexedDB version-2 upgrade collapses old scoped entries to the newest record for each document page and deletes the superseded keys; all new translations overwrite that single page key.

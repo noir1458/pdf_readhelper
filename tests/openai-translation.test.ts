@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { extractResponseText } from "../src/translation/openai-translation";
 import { translationCacheKey } from "../src/translation/translation-cache";
+import { translationPrompt } from "../src/translation/translation-provider";
 
 describe("OpenAI translation responses", () => {
   it("reads the convenience output_text field", () => {
@@ -30,12 +31,20 @@ describe("OpenAI translation responses", () => {
 });
 
 describe("translation cache keys", () => {
-  it("separates providers, documents, pages, and models", () => {
-    const key = translationCacheKey("document-a", 17, "openai", "gpt-5.6-luna");
+  it("keeps only one latest translation slot per document page", () => {
+    const key = translationCacheKey("document-a", 17);
     expect(key).toContain("document-a:17");
-    expect(key).not.toBe(translationCacheKey("document-a", 17, "gemini", "gpt-5.6-luna"));
-    expect(key).not.toBe(translationCacheKey("document-a", 18, "openai", "gpt-5.6-luna"));
-    expect(key).not.toBe(translationCacheKey("document-b", 17, "openai", "gpt-5.6-luna"));
-    expect(key).not.toBe(translationCacheKey("document-a", 17, "openai", "gpt-5.6-terra"));
+    expect(key).not.toBe(translationCacheKey("document-a", 18));
+    expect(key).not.toBe(translationCacheKey("document-b", 17));
+  });
+});
+
+describe("translation prompt", () => {
+  it("uses an English instruction with an explicit target language", () => {
+    const prompt = translationPrompt(9, "Vietnamese (vi)");
+
+    expect(prompt).toContain("PDF page 9");
+    expect(prompt).toContain("Target language (language name or BCP 47 code): Vietnamese (vi).");
+    expect(prompt).toContain("Do not summarize or omit content.");
   });
 });

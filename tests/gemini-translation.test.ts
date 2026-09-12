@@ -73,6 +73,7 @@ describe("Gemini translation responses", () => {
       "AIza-test-key-long-enough-for-unit-test",
       new Blob(["png"], { type: "image/png" }),
       7,
+      "Japanese (ja)",
     );
 
     expect(result.text).toBe("번역 결과");
@@ -89,6 +90,9 @@ describe("Gemini translation responses", () => {
       generationConfig: { thinkingConfig: { thinkingLevel: string } };
     };
     expect(body.generationConfig.thinkingConfig.thinkingLevel).toBe("low");
+    const prompt = body.contents[0]?.parts[0]?.text;
+    expect(typeof prompt).toBe("string");
+    expect(prompt).toContain("Target language (language name or BCP 47 code): Japanese (ja).");
     expect(body.contents[0]?.parts[1]).toMatchObject({
       inline_data: { mime_type: "image/png", data: "cG5n" },
     });
@@ -116,6 +120,7 @@ describe("Gemini translation responses", () => {
         "AIza-test-key-long-enough-for-unit-test",
         new Blob(["png"], { type: "image/png" }),
         1,
+        "Korean (ko)",
       ),
     ).rejects.toThrow(
       "현재 Gemini 모델 사용량이 많습니다. 잠시 후 다시 시도하거나 설정에서 다른 모델을 선택하세요.",

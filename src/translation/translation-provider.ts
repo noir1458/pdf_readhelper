@@ -22,23 +22,29 @@ export type TranslationProvider = {
   defaultModelId: string;
   models: readonly TranslationModelInfo[];
   apiKeyPlaceholder: string;
+  apiKeyUrl: string;
   translatePageImage: (
     modelId: string,
     apiKey: string,
     image: Blob,
     pageNumber: number,
+    targetLanguage: string,
     signal?: AbortSignal,
   ) => Promise<PageTranslation>;
 };
 
 export type TranslationProviderInfo = Pick<
   TranslationProvider,
-  "id" | "displayName" | "defaultModelId" | "models" | "apiKeyPlaceholder"
+  "id" | "displayName" | "defaultModelId" | "models" | "apiKeyPlaceholder" | "apiKeyUrl"
 >;
 
-export function translationPrompt(pageNumber: number): string {
+export const DEFAULT_TRANSLATION_LANGUAGE = "Korean (ko)";
+
+export function translationPrompt(pageNumber: number, targetLanguage: string): string {
   return [
-    `Translate every readable part of PDF page ${pageNumber} into natural Korean.`,
+    `Translate every readable part of PDF page ${pageNumber}.`,
+    `Target language (language name or BCP 47 code): ${targetLanguage}.`,
+    "Use natural, fluent wording in the target language.",
     "Do not summarize or omit content.",
     "Preserve the original order and structure of headings, paragraphs, lists, captions, footnotes, and page labels.",
     "Keep code, commands, paths, identifiers, and formulas unchanged, translating only their surrounding prose.",

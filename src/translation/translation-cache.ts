@@ -1,4 +1,10 @@
-import type { TranslationProviderId, TranslationUsage } from "./translation-provider";
+import {
+  DEFAULT_TRANSLATION_LANGUAGE,
+  finiteNumber,
+  isRecord,
+  type TranslationProviderId,
+  type TranslationUsage,
+} from "./translation-provider";
 
 export type CachedPageTranslation = {
   id: string;
@@ -6,13 +12,14 @@ export type CachedPageTranslation = {
   pageNumber: number;
   providerId: TranslationProviderId;
   model: string;
+  targetLanguage: string;
   text: string;
   usage: TranslationUsage;
   updatedAt: number;
 };
 
 const DATABASE_NAME = "pdf-read-helper-translations";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const TRANSLATION_STORE = "translations";
 const DOCUMENT_INDEX = "documentId";
 const CAPTURE_VERSION = "cropped-70-v1";
@@ -20,28 +27,16 @@ const CAPTURE_VERSION = "cropped-70-v1";
 export class TranslationCache {
   #databasePromise: Promise<IDBDatabase> | null = null;
 
-  async get(
-    documentId: string,
-    pageNumber: number,
-    providerId: TranslationProviderId,
-    model: string,
-  ): Promise<CachedPageTranslation | null> {
+  async get(documentId: string, pageNumber: number): Promise<CachedPageTranslation | null> {
     const database = await this.#database();
     const transaction = database.transaction(TRANSLATION_STORE, "readonly");
     const store = transaction.objectStore(TRANSLATION_STORE);
     const recordPromise = requestResult<CachedPageTranslation | undefined>(
-      store.get(translationCacheKey(documentId, pageNumber, providerId, model)),
+      store.get(translationCacheKey(documentId, pageNumber)),
     );
-    const legacyRecordPromise =
-      providerId === "openai"
-        ? requestResult<LegacyCachedPageTranslation | undefined>(
-            store.get(legacyTranslationCacheKey(documentId, pageNumber, model)),
-          )
-        : Promise.resolve(undefined);
-    const [record, legacyRecord] = await Promise.all([recordPromise, legacyRecordPromise]);
+    const record = await recordPromise;
     await transactionDone(transaction);
-    if (record) return record;
-    return legacyRecord ? { ...legacyRecord, providerId } : null;
+    return record ?? null;
   }
 
   async put(
@@ -49,15 +44,17 @@ export class TranslationCache {
     pageNumber: number,
     providerId: TranslationProviderId,
     model: string,
+    targetLanguage: string,
     text: string,
     usage: TranslationUsage,
   ): Promise<CachedPageTranslation> {
     const record: CachedPageTranslation = {
-      id: translationCacheKey(documentId, pageNumber, providerId, model),
+      id: translationCacheKey(documentId, pageNumber),
       documentId,
       pageNumber,
       providerId,
       model,
+      targetLanguage,
       text,
       usage,
       updatedAt: Date.now(),
@@ -86,11 +83,18 @@ export class TranslationCache {
   #database(): Promise<IDBDatabase> {
     this.#databasePromise ??= new Promise((resolve, reject) => {
       const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-      request.addEventListener("upgradeneeded", () => {
+      request.addEventListener("upgradeneeded", (event) => {
         const database = request.result;
-        if (database.objectStoreNames.contains(TRANSLATION_STORE)) return;
-        const store = database.createObjectStore(TRANSLATION_STORE, { keyPath: "id" });
-        store.createIndex(DOCUMENT_INDEX, DOCUMENT_INDEX, { unique: false });
+        if (!database.objectStoreNames.contains(TRANSLATION_STORE)) {
+          const store = database.createObjectStore(TRANSLATION_STORE, { keyPath: "id" });
+          store.createIndex(DOCUMENT_INDEX, DOCUMENT_INDEX, { unique: false });
+          return;
+        }
+        if (event.oldVersion < 2) {
+          collapseLegacyTranslationRecords(
+            request.transaction?.objectStore(TRANSLATION_STORE) ?? null,
+          );
+        }
       });
       request.addEventListener("success", () => resolve(request.result));
       request.addEventListener("error", () =>
@@ -104,16 +108,72 @@ export class TranslationCache {
 export function translationCacheKey(
   documentId: string,
   pageNumber: number,
-  providerId: TranslationProviderId,
-  model: string,
 ): string {
-  return `${CAPTURE_VERSION}:${providerId}:${model}:${documentId}:${pageNumber}`;
+  return `${CAPTURE_VERSION}:latest:${documentId}:${pageNumber}`;
 }
 
-type LegacyCachedPageTranslation = Omit<CachedPageTranslation, "providerId">;
+function collapseLegacyTranslationRecords(store: IDBObjectStore | null): void {
+  if (!store) return;
+  const cursorRequest = store.openCursor();
+  cursorRequest.addEventListener("success", () => {
+    const cursor = cursorRequest.result;
+    if (!cursor) return;
+    const record = cachedPageTranslation(cursor.value);
+    if (!record) {
+      cursor.continue();
+      return;
+    }
+    const latestId = translationCacheKey(record.documentId, record.pageNumber);
+    if (cursor.primaryKey === latestId) {
+      cursor.continue();
+      return;
+    }
+    const latestRequest = store.get(latestId);
+    latestRequest.addEventListener("success", () => {
+      const latest = cachedPageTranslation(latestRequest.result);
+      if (!latest || latest.updatedAt <= record.updatedAt) {
+        store.put({ ...record, id: latestId });
+      }
+      cursor.delete();
+      cursor.continue();
+    });
+  });
+}
 
-function legacyTranslationCacheKey(documentId: string, pageNumber: number, model: string): string {
-  return `${CAPTURE_VERSION}:${model}:${documentId}:${pageNumber}`;
+function cachedPageTranslation(value: unknown): CachedPageTranslation | null {
+  if (
+    !isRecord(value) ||
+    typeof value.documentId !== "string" ||
+    typeof value.pageNumber !== "number" ||
+    !Number.isInteger(value.pageNumber) ||
+    typeof value.model !== "string" ||
+    typeof value.text !== "string"
+  ) {
+    return null;
+  }
+  const providerId: TranslationProviderId = value.providerId === "gemini" ? "gemini" : "openai";
+  const targetLanguage =
+    typeof value.targetLanguage === "string"
+      ? value.targetLanguage
+      : DEFAULT_TRANSLATION_LANGUAGE;
+  const usage: TranslationUsage = {};
+  if (isRecord(value.usage)) {
+    const inputTokens = finiteNumber(value.usage.inputTokens);
+    const outputTokens = finiteNumber(value.usage.outputTokens);
+    if (inputTokens !== undefined) usage.inputTokens = inputTokens;
+    if (outputTokens !== undefined) usage.outputTokens = outputTokens;
+  }
+  return {
+    id: typeof value.id === "string" ? value.id : "",
+    documentId: value.documentId,
+    pageNumber: value.pageNumber,
+    providerId,
+    model: value.model,
+    targetLanguage,
+    text: value.text,
+    usage,
+    updatedAt: finiteNumber(value.updatedAt) ?? 0,
+  };
 }
 
 function requestResult<T>(request: IDBRequest): Promise<T> {

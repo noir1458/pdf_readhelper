@@ -32,8 +32,9 @@ PDF Read Helper provides an extension-owned PDF.js reader. From the current page
 - Current PDF page rendered to PNG independently of browser UI and viewer zoom
 - Local pixel-based margin detection, safe content cropping, and 70% output resampling
 - PNG clipboard write with automatic download fallback
-- Translucent right-side Korean translation overlay with provider-specific model selection for Gemini and OpenAI
-- Provider-specific session-memory-only API keys and local page translation cache
+- Highly translucent, result-first translation overlay with provider/model/key details contained in gear settings
+- Editable target-language field with common suggestions, a bottom three-state opacity control, opt-in cache-aware auto translation, and provider-specific API-key links
+- Provider-specific session-memory-only API keys and one latest local translation cache entry per PDF page
 - Original PDF page-object extraction, such as `2-11.pdf`
 - Keyboard shortcuts
 - No remote code, analytics, persistent API-key storage, or backend
@@ -138,11 +139,13 @@ Browser tabs, scrollbars, and extension controls are not captured. If the clipbo
 ### Translate the current page
 
 1. Click **AI / Translate** in the top toolbar.
-2. Open the gear menu, select **Gemini** or **OpenAI**, choose a model, then enter that provider's API key. Each key remains only in this viewer tab's memory and is forgotten when the tab closes.
-3. Use the bottom translation action. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
-4. Read the Korean result in the right panel or copy it as text.
+2. Open the gear menu, select **Gemini** or **OpenAI**, choose a model, and enter that provider's API key. The small provider-aware link opens the official key page. Each key remains only in this viewer tab's memory and is forgotten when the tab closes.
+3. Set the target language using a suggested value such as `Korean (ko)` or type any language name/BCP 47 code.
+4. Use the compact bottom translation action. The adjacent half-filled-circle control cycles the translation background through transparent, balanced, and strong states. Gemini currently offers `gemini-3.8-flash` and `gemini-3.1-flash-lite` with low thinking; OpenAI offers `gpt-5.6-luna` with `detail: high`, reasoning disabled, and `store: false`.
+5. Optionally enable **AUTO**. While it is on and the translation panel is open, moving to another page waits 650 ms after the cache check and requests a translation only when that PDF page has no cached result. Moving again during that pause cancels the pending request. Hover or focus the button to see the per-page token/cost warning.
+6. Read the target-language result in the right panel or copy it as text.
 
-Opening the panel, switching providers/models, or scrolling never sends a request. Results are cached locally by provider, model, PDF, and page, so revisiting a translated page does not incur another request. **Translate again** makes a new billed request and replaces that provider/model's cached result. Request errors remain in the result conversation with retry and settings actions instead of disappearing with a toast.
+Opening the panel, changing provider/model/language, cycling opacity, or moving pages with **AUTO** off never sends a request. Each PDF page keeps only its latest translation locally, including metadata that identifies the provider, model, and target language that produced it. Changing those settings does not duplicate or invalidate the page cache; pressing **Translate again** replaces that page's previous result. With **AUTO** on, each newly visited uncached page can create a billed request, while any already-cached page remains local-only. Request errors remain in the result conversation with retry and settings actions instead of disappearing with a toast.
 
 Direct browser-held API keys are intended solely for the owner's private unpacked extension. Do not use this design in a distributed build; introduce a server-side proxy or short-lived credential flow first. Use dedicated provider projects and appropriate spending limits.
 
@@ -273,11 +276,13 @@ Automated checks cannot prove browser-only APIs. After loading `dist`, verify:
 - [ ] Copy a page, paste into another application, and confirm only the PDF page appears
 - [ ] Confirm normal white-page margins are cropped without cutting headers, footers, or page numbers
 - [ ] Confirm colored covers, blank pages, scanned pages, and dark pages use safe bounds
-- [ ] Open and close the translation panel and confirm that scrolling alone does not send requests
-- [ ] Confirm the translucent translation overlay leaves the original page visible underneath, does not resize the PDF, keeps response text readable over white/dark pages, and keeps Translate, Settings, and Close together at the bottom
-- [ ] Translate one page with each provider/model option and verify Korean output and token counts
-- [ ] Switch providers and models, then revisit that page; confirm each provider/model cache loads without another request
-- [ ] Open/close the gear settings with its button, Escape, and an outside click; switch provider/model, replace/delete each key, and confirm the main conversation stays usable
+- [ ] Open and close the translation panel and confirm that page changes do not send requests while AUTO is off
+- [ ] Confirm the highly translucent translation overlay leaves the original page visible underneath, does not resize the PDF, shows only translation content above the bottom controls, and keeps text readable over white/dark pages
+- [ ] Confirm provider/model/key controls and key readiness/deletion appear only in gear settings, while the cached result's page/provider/model/language/token provenance appears directly above the translation
+- [ ] Translate one page with each provider/model option and verify the selected target-language output and token counts
+- [ ] Switch providers, models, and target languages, then revisit a translated page; confirm its one latest result remains, its creation metadata is visible above the result, and a new translation replaces it
+- [ ] Open/close the gear settings with its button, Escape, and an outside click; switch provider/model, use a suggested and custom BCP 47 target, follow each official API-key link, replace/delete each key, and confirm the result remains usable
+- [ ] Cycle all three opacity states from the bottom control; enable AUTO, hover/focus its cost warning, rapidly cross several pages, and confirm only the final settled uncached page triggers after the delay
 - [ ] Use **Translate again**, **Copy translation**, inline **Retry**, inline **Check settings**, Escape, and the panel close button
 - [ ] Trigger a temporary Gemini failure and confirm the full error remains in the translation result instead of appearing only as a toast
 - [ ] Trigger a denied clipboard and confirm PNG fallback download

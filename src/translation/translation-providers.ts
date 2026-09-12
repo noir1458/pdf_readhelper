@@ -14,13 +14,16 @@ export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = [
 ];
 
 export const TRANSLATION_PROVIDER_INFO: readonly TranslationProviderInfo[] =
-  TRANSLATION_PROVIDERS.map(({ id, displayName, defaultModelId, models, apiKeyPlaceholder }) => ({
-    id,
-    displayName,
-    defaultModelId,
-    models,
-    apiKeyPlaceholder,
-  }));
+  TRANSLATION_PROVIDERS.map(
+    ({ id, displayName, defaultModelId, models, apiKeyPlaceholder, apiKeyUrl }) => ({
+      id,
+      displayName,
+      defaultModelId,
+      models,
+      apiKeyPlaceholder,
+      apiKeyUrl,
+    }),
+  );
 
 export function translationProvider(providerId: TranslationProviderId): TranslationProvider {
   const provider = TRANSLATION_PROVIDERS.find(({ id }) => id === providerId);

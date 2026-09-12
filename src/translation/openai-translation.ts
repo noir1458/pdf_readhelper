@@ -19,6 +19,7 @@ export const OPENAI_TRANSLATION_PROVIDER: TranslationProvider = {
   defaultModelId: OPENAI_TRANSLATION_MODEL,
   models: OPENAI_TRANSLATION_MODELS,
   apiKeyPlaceholder: "sk-…",
+  apiKeyUrl: "https://platform.openai.com/api-keys",
   translatePageImage,
 };
 
@@ -27,6 +28,7 @@ export async function translatePageImage(
   apiKey: string,
   image: Blob,
   pageNumber: number,
+  targetLanguage: string,
   signal?: AbortSignal,
 ): Promise<PageTranslation> {
   const imageUrl = await blobToDataUrl(image);
@@ -47,7 +49,7 @@ export async function translatePageImage(
           content: [
             {
               type: "input_text",
-              text: translationPrompt(pageNumber),
+              text: translationPrompt(pageNumber, targetLanguage),
             },
             {
               type: "input_image",

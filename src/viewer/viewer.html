@@ -672,13 +672,6 @@
       </main>
 
       <aside id="translation-panel" class="translation-panel" aria-label="Page translation" hidden>
-        <header class="translation-panel-header">
-          <div>
-            <strong>페이지 번역</strong>
-            <span id="translation-page-label">페이지 1</span>
-          </div>
-        </header>
-
         <section
           id="translation-settings-popover"
           class="translation-settings-popover"
@@ -702,16 +695,50 @@
           </header>
           <div class="translation-settings-fields">
             <label class="translation-setting-field" for="translation-provider">
-              <span>번역 AI</span>
+              <span>현재 번역 AI</span>
               <select id="translation-provider"></select>
             </label>
             <label class="translation-setting-field" for="translation-model">
-              <span>모델</span>
+              <span>선택된 모델</span>
               <select id="translation-model"></select>
             </label>
+            <label
+              class="translation-setting-field translation-language-field"
+              for="translation-target-language"
+            >
+              <span>번역 목표 언어</span>
+              <input
+                id="translation-target-language"
+                type="text"
+                value="Korean (ko)"
+                list="translation-language-suggestions"
+                maxlength="60"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <datalist id="translation-language-suggestions">
+              <option value="Korean (ko)"></option>
+              <option value="English (en)"></option>
+              <option value="Japanese (ja)"></option>
+              <option value="Chinese, Simplified (zh-Hans)"></option>
+              <option value="Chinese, Traditional (zh-Hant)"></option>
+              <option value="Spanish (es)"></option>
+              <option value="French (fr)"></option>
+              <option value="German (de)"></option>
+            </datalist>
           </div>
           <form id="translation-key-form" class="translation-key-form">
-            <label id="translation-api-key-label" for="translation-api-key">Gemini API key</label>
+            <div class="translation-key-label-row">
+              <label id="translation-api-key-label" for="translation-api-key">Gemini API key</label>
+              <a
+                id="translation-api-key-link"
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Gemini API 키 받기 ↗</a
+              >
+            </div>
             <div>
               <input
                 id="translation-api-key"
@@ -729,33 +756,27 @@
             현재 AI 키 삭제
           </button>
           <p id="translation-key-description" class="translation-key-description">
-            키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. 번역할 때 현재 페이지 이미지만
-            Gemini로 전송됩니다.
+            키는 이 뷰어 탭의 메모리에만 유지되며 저장되지 않습니다. 번역할 때 현재 페이지 이미지와
+            번역 지시문이 Gemini로 전송됩니다.
           </p>
         </section>
 
         <section id="translation-workspace" class="translation-workspace">
           <div class="translation-conversation">
-            <div class="translation-request">
-              <span aria-hidden="true">PDF</span>
-              <p id="translation-request-text">페이지 1을 원문 구조 그대로 한국어로 번역해줘.</p>
-            </div>
-            <div class="translation-response">
-              <div class="translation-ai-mark" aria-hidden="true">AI</div>
-              <div class="translation-response-body">
-                <p id="translation-status" class="translation-status" aria-live="polite"></p>
-                <div id="translation-error" class="translation-error" role="alert" hidden>
-                  <strong>번역하지 못했습니다</strong>
-                  <p id="translation-error-message"></p>
-                  <div>
-                    <button id="retry-translation" type="button">다시 시도</button>
-                    <button id="error-translation-settings" type="button">설정 확인</button>
-                  </div>
+            <div class="translation-response-body">
+              <p id="translation-result-state" class="translation-result-state" hidden></p>
+              <p id="translation-status" class="translation-status" aria-live="polite" hidden></p>
+              <div id="translation-error" class="translation-error" role="alert" hidden>
+                <strong>번역하지 못했습니다</strong>
+                <p id="translation-error-message"></p>
+                <div>
+                  <button id="retry-translation" type="button">다시 시도</button>
+                  <button id="error-translation-settings" type="button">설정 확인</button>
                 </div>
-                <article id="translation-output" class="translation-output"></article>
-                <div id="translation-result-actions" class="translation-result-actions" hidden>
-                  <button id="copy-translation" type="button">번역 복사</button>
-                </div>
+              </div>
+              <article id="translation-output" class="translation-output"></article>
+              <div id="translation-result-actions" class="translation-result-actions" hidden>
+                <button id="copy-translation" type="button">번역 복사</button>
               </div>
             </div>
           </div>
@@ -766,6 +787,29 @@
                 <span class="translation-send" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><path d="m6 12 6-6 6 6M12 6v12" /></svg>
                 </span>
+              </button>
+              <button
+                id="toggle-translation-auto"
+                class="translation-bottom-button translation-auto"
+                type="button"
+                aria-label="자동 번역 켜기"
+                aria-describedby="translation-auto-help"
+                aria-pressed="false"
+              >
+                AUTO
+                <span id="translation-auto-help" class="translation-auto-tooltip" role="tooltip">
+                  페이지 이동 후 잠시 멈췄을 때 저장된 번역이 없으면 자동으로 요청합니다. 페이지마다
+                  토큰과 비용이 발생할 수 있습니다.
+                </span>
+              </button>
+              <button
+                id="cycle-translation-theme"
+                class="icon-button translation-bottom-button translation-theme-button"
+                type="button"
+                aria-label="번역 화면 투명도: 현재 수준"
+                title="번역 화면 투명도: 현재 수준"
+              >
+                <span id="translation-theme-indicator" aria-hidden="true">◐</span>
               </button>
               <button
                 id="open-translation-settings"
@@ -792,7 +836,6 @@
                 ×
               </button>
             </div>
-            <p id="translation-active-model">Gemini · Gemini 3.8 Flash</p>
           </div>
         </section>
       </aside>

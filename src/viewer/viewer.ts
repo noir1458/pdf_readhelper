@@ -197,10 +197,10 @@ const translationPanel = new TranslationPanel(
   DEFAULT_TRANSLATION_PROVIDER_ID,
   {
     translate: requestPageTranslation,
-    selectionChanged: (providerId, modelId, pageNumber) => {
+    selectionChanged: (providerId, modelId, targetLanguage, pageNumber) => {
       translationRequestController?.abort();
       translationRequestController = null;
-      void loadCachedTranslation(pageNumber, providerId, modelId);
+      void loadCachedTranslation(pageNumber, providerId, modelId, targetLanguage);
     },
     openChanged: (open) => toolbar.setTranslationOpen(open),
   },
@@ -599,7 +599,12 @@ async function openBytes(
   updatePageHistoryButtons();
   documentSidebar.setActiveDocument(libraryId);
   if (translationPanel.isOpen) {
-    void loadCachedTranslation(initialPage, translationPanel.providerId, translationPanel.modelId);
+    void loadCachedTranslation(
+      initialPage,
+      translationPanel.providerId,
+      translationPanel.modelId,
+      translationPanel.targetLanguage,
+    );
   }
   toolbar.show(pdfDocument.numPages);
   scheduleTopbarCollapse();
@@ -705,6 +710,7 @@ async function renderNear(pageNumber: number): Promise<void> {
 }
 
 function updateCurrentPage(pageNumber: number): void {
+  const pageChanged = session.snapshot.currentPage !== pageNumber;
   session.setCurrentPage(pageNumber);
   updatePagedPageVisibility();
   tracker.setCurrentPage(pageNumber);
@@ -716,7 +722,17 @@ function updateCurrentPage(pageNumber: number): void {
   scheduleReadingPositionSave(pageNumber);
   renderer?.releaseDistant(pageNumber);
   if (translationPanel.isOpen) {
-    void loadCachedTranslation(pageNumber, translationPanel.providerId, translationPanel.modelId);
+    if (pageChanged) {
+      translationRequestController?.abort();
+      translationRequestController = null;
+    }
+    void loadCachedTranslation(
+      pageNumber,
+      translationPanel.providerId,
+      translationPanel.modelId,
+      translationPanel.targetLanguage,
+      pageChanged && translationPanel.autoTranslateEnabled,
+    );
   }
 }
 
@@ -1061,6 +1077,7 @@ async function removeSavedDocument(id: string): Promise<void> {
     translationPanel.showPage(
       translationPanel.providerId,
       translationPanel.modelId,
+      translationPanel.targetLanguage,
       session.snapshot.currentPage,
       null,
     );
@@ -1553,34 +1570,50 @@ function toggleTranslationPanel(): void {
   }
   const pageNumber = session.snapshot.currentPage;
   translationPanel.open(pageNumber);
-  void loadCachedTranslation(pageNumber, translationPanel.providerId, translationPanel.modelId);
+  void loadCachedTranslation(
+    pageNumber,
+    translationPanel.providerId,
+    translationPanel.modelId,
+    translationPanel.targetLanguage,
+  );
 }
 
 async function loadCachedTranslation(
   pageNumber: number,
   providerId: TranslationProviderId,
   modelId: string,
+  targetLanguage: string,
+  autoTranslateIfMissing = false,
 ): Promise<void> {
   const documentId = activeDocumentId;
-  translationPanel.showPage(providerId, modelId, pageNumber, null);
+  translationPanel.showPage(providerId, modelId, targetLanguage, pageNumber, null);
   if (!documentId) return;
   const provider = translationProvider(providerId);
   translationModel(provider, modelId);
   try {
-    const translation = await translationCache.get(documentId, pageNumber, provider.id, modelId);
+    const translation = await translationCache.get(documentId, pageNumber);
     if (
       translationPanel.isOpen &&
       translationPanel.providerId === providerId &&
       translationPanel.modelId === modelId &&
+      translationPanel.targetLanguage === targetLanguage &&
       activeDocumentId === documentId &&
       session.snapshot.currentPage === pageNumber
     ) {
-      translationPanel.showPage(providerId, modelId, pageNumber, translation);
+      translationPanel.showPage(
+        providerId,
+        modelId,
+        targetLanguage,
+        pageNumber,
+        translation,
+        autoTranslateIfMissing,
+      );
     }
   } catch {
     translationPanel.showError(
       providerId,
       modelId,
+      targetLanguage,
       pageNumber,
       "저장된 번역을 불러오지 못했습니다.",
     );
@@ -1590,6 +1623,7 @@ async function loadCachedTranslation(
 async function requestPageTranslation(
   providerId: TranslationProviderId,
   modelId: string,
+  targetLanguage: string,
   pageNumber: number,
   apiKey: string,
 ): Promise<CachedPageTranslation> {
@@ -1610,6 +1644,7 @@ async function requestPageTranslation(
       apiKey,
       pageImage,
       pageNumber,
+      targetLanguage,
       controller.signal,
     );
     return await translationCache.put(
@@ -1617,6 +1652,7 @@ async function requestPageTranslation(
       pageNumber,
       provider.id,
       modelId,
+      targetLanguage,
       result.text,
       result.usage,
     );

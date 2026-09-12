@@ -20,6 +20,7 @@ export const GEMINI_TRANSLATION_PROVIDER: TranslationProvider = {
   defaultModelId: GEMINI_TRANSLATION_MODEL,
   models: GEMINI_TRANSLATION_MODELS,
   apiKeyPlaceholder: "AIza…",
+  apiKeyUrl: "https://aistudio.google.com/app/apikey",
   translatePageImage,
 };
 
@@ -28,6 +29,7 @@ export async function translatePageImage(
   apiKey: string,
   image: Blob,
   pageNumber: number,
+  targetLanguage: string,
   signal?: AbortSignal,
 ): Promise<PageTranslation> {
   const imageData = await blobToBase64(image);
@@ -44,7 +46,7 @@ export async function translatePageImage(
           {
             role: "user",
             parts: [
-              { text: translationPrompt(pageNumber) },
+              { text: translationPrompt(pageNumber, targetLanguage) },
               {
                 inline_data: {
                   mime_type: image.type || "image/png",
